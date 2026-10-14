@@ -1,0 +1,683 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Shaxsiy hisob</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{
+  --bg:var(--tg-theme-bg-color,#ffffff);
+  --bg2:var(--tg-theme-secondary-bg-color,#f2f3f5);
+  --text:var(--tg-theme-text-color,#111);
+  --hint:var(--tg-theme-hint-color,#8a8f98);
+  --btn:var(--tg-theme-button-color,#2a8bf2);
+  --btnText:var(--tg-theme-button-text-color,#fff);
+  --green:#1fa463; --red:#e5484d; --orange:#e08a00;
+}
+*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,system-ui,"Segoe UI",Roboto,sans-serif}
+body{background:var(--bg2);color:var(--text);padding:12px 12px calc(84px + env(safe-area-inset-bottom));-webkit-tap-highlight-color:transparent}
+.card{background:var(--bg);border-radius:14px;padding:14px;margin-bottom:12px}
+.lbl{color:var(--hint);font-size:13px}
+.big{font-size:28px;font-weight:700;margin:2px 0 10px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.mini{background:var(--bg2);border-radius:10px;padding:9px 10px;min-width:0}
+.mini small{color:var(--hint);font-size:12px;display:block}
+.mini b{display:block;font-size:15px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.green{color:var(--green)}.red{color:var(--red)}.orange{color:var(--orange)}
+h3{font-size:14px;color:var(--hint);font-weight:600;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.line{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--bg2);font-size:15px;gap:8px}
+.line:last-child{border-bottom:none}
+.line b{white-space:nowrap}
+.month{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.month button{background:var(--bg);border:none;color:var(--text);width:40px;height:36px;border-radius:10px;font-size:18px}
+.month span{font-weight:600}
+.addbtn{width:100%;background:var(--btn);color:var(--btnText);border:none;border-radius:12px;padding:13px;font-size:15px;font-weight:600;margin-bottom:12px}
+.row2{display:flex;gap:8px}
+.row2 .addbtn{flex:1}
+.ghost{background:var(--bg);color:var(--btn)}
+.item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--bg2)}
+.item:last-child{border-bottom:none}
+.ico{width:38px;height:38px;border-radius:50%;background:var(--bg2);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.mid{flex:1;min-width:0}
+.mid div{font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mid small{color:var(--hint);font-size:12px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.amt{font-weight:700;font-size:15px;white-space:nowrap;text-align:right}
+.amt small{display:block;font-weight:500;font-size:12px;color:var(--hint)}
+.bdg{display:inline-block;font-size:12px;font-weight:600;padding:3px 8px;border-radius:10px;background:var(--bg2);color:var(--hint);margin-top:3px}
+.bdg.bad{background:rgba(229,72,77,.14);color:var(--red)}
+.bdg.warn{background:rgba(224,138,0,.15);color:var(--orange)}
+.bdg.ok{background:rgba(31,164,99,.14);color:var(--green)}
+.empty{text-align:center;color:var(--hint);padding:20px 0;font-size:14px}
+.bar{margin-bottom:10px}
+.bar .top{display:flex;justify-content:space-between;font-size:14px;margin-bottom:4px}
+.track{height:8px;background:var(--bg2);border-radius:4px;overflow:hidden}
+.fill{height:100%;border-radius:4px;background:var(--red)}
+.filters{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.filters button{border:none;background:var(--bg);color:var(--text);padding:8px 14px;border-radius:20px;font-size:14px}
+.filters button.on{background:var(--btn);color:var(--btnText)}
+nav{position:fixed;left:0;right:0;bottom:0;background:var(--bg);display:flex;border-top:1px solid var(--bg2);padding-bottom:env(safe-area-inset-bottom);z-index:5}
+nav button{flex:1;min-width:0;border:none;background:none;color:var(--hint);padding:8px 0 9px;font-size:11px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:2px}
+nav button span{font-size:20px}
+nav button.on{color:var(--btn)}
+.sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:flex-end;z-index:10}
+.sheet-bg.show{display:flex}
+.sheet{background:var(--bg);width:100%;border-radius:18px 18px 0 0;padding:16px 16px calc(20px + env(safe-area-inset-bottom));max-height:92vh;overflow:auto}
+.sheet h2{font-size:18px;margin-bottom:6px}
+.sheet h4{font-size:14px;color:var(--hint);margin:16px 0 4px}
+label{display:block;font-size:13px;color:var(--hint);margin:10px 0 4px}
+input{width:100%;padding:12px;border-radius:10px;border:none;background:var(--bg2);color:var(--text);font-size:16px;outline:none;-webkit-appearance:none}
+input.num{font-weight:700;font-size:18px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips button{border:none;background:var(--bg2);color:var(--text);padding:8px 12px;border-radius:20px;font-size:14px}
+.chips button.on{background:var(--btn);color:var(--btnText)}
+.actions{display:flex;gap:8px;margin-top:16px}
+.actions button{flex:1;padding:14px;border-radius:12px;border:none;font-size:15px;font-weight:600}
+.save{background:var(--btn);color:var(--btnText)}
+.cancel{background:var(--bg2);color:var(--text)}
+.del{background:none;color:var(--red);border:none;width:100%;padding:12px;margin-top:6px;font-size:15px}
+.x{background:none;border:none;color:var(--red);font-size:18px;padding:0 4px}
+.box{background:var(--bg2);border-radius:12px;padding:10px 12px;margin-top:8px}
+.box .line{border-bottom-color:var(--bg)}
+.progress{height:8px;background:var(--bg2);border-radius:4px;overflow:hidden;margin-top:6px}
+.progress div{height:100%;background:var(--green);border-radius:4px}
+#backBtn{position:fixed;top:10px;left:10px;z-index:30;display:none;align-items:center;border:none;border-radius:20px;padding:8px 14px;font-size:15px;font-weight:600;background:var(--bg);color:var(--btn);box-shadow:0 2px 10px rgba(0,0,0,.15)}
+</style>
+</head>
+<body>
+
+<div id="page"></div>
+
+<nav>
+  <button data-act="tab" data-t="home" class="on"><span>🏠</span>Asosiy</button>
+  <button data-act="tab" data-t="ops"><span>💸</span>Kirim-chiqim</button>
+  <button data-act="tab" data-t="debt"><span>🤝</span>Qarzlar</button>
+  <button data-act="tab" data-t="loan"><span>🏦</span>Kredit</button>
+</nav>
+
+<div class="sheet-bg" id="sheetBg"><div class="sheet" id="sheet"></div></div>
+<button id="backBtn" aria-label="Orqaga">‹ Orqaga</button>
+
+<script>
+const tg = (window.Telegram && Telegram.WebApp) ? Telegram.WebApp : null;
+if (tg) { tg.ready(); tg.expand(); }
+
+/* ================= Sozlamalar ================= */
+const CUR = {UZS:"so'm", USD:"$"};
+const EXP_CATS = ["Oziq-ovqat","Transport","Uy-joy","Kommunal","Aloqa","Kiyim","Sog'liq","Ta'lim","Oila","Ko'ngilochar","Sovg'a","Boshqa"];
+const INC_CATS = ["Do'kondan","Maosh","Biznes","Sovg'a","Boshqa"];
+const MONTHS = ["Yanvar","Fevral","Mart","Aprel","May","Iyun","Iyul","Avgust","Sentabr","Oktabr","Noyabr","Dekabr"];
+
+let D = null;
+let tab = "home", cur = new Date(), opFilter = "all", debtFilter = "open", F = {};
+cur.setDate(1);
+
+/* ================= Yordamchilar ================= */
+const $ = id => document.getElementById(id);
+const fmt = n => Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g," ");
+const money = (n, c) => c==="USD" ? `${n<0?"−":""}$${fmt(Math.abs(n))}` : `${n<0?"−":""}${fmt(Math.abs(n))} so'm`;
+const esc = s => String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let _u = 0; const uid = () => Date.now()*1000 + (_u++ % 1000);
+const today = () => { const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); };
+const dnum = s => Math.round(Date.UTC(+s.slice(0,4), +s.slice(5,7)-1, +s.slice(8,10))/864e5);
+const fd = s => s ? `${+s.slice(8,10)} ${MONTHS[+s.slice(5,7)-1].slice(0,3).toLowerCase()} ${s.slice(0,4)}` : "";
+const monthKey = d => d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
+const num = id => +(($(id)?.value||"").replace(/\D/g,"")) || 0;
+const sum = (a,f) => a.reduce((s,x)=>s+f(x),0);
+const haptic = t => { try { tg && tg.HapticFeedback.notificationOccurred(t); } catch(e){} };
+const acc = id => D.accs.find(a=>a.id===+id);
+const accCur = id => (acc(id)||{}).cur || "UZS";
+const accName = id => (acc(id)||{}).name || "?";
+
+function normalize(d){
+  const r = { accs:d.accs||[], ops:d.ops||[], debts:d.debts||[], loans:d.loans||[], rate:d.rate||12800 };
+  if (!r.accs.length) r.accs = [
+    {id:uid(), name:"💵 Naqd", cur:"UZS", start:0},
+    {id:uid(), name:"💳 Karta", cur:"UZS", start:0},
+    {id:uid(), name:"💵 Dollar", cur:"USD", start:0}];
+  return r;
+}
+function balances(){
+  const b = {}; D.accs.forEach(a=>b[a.id]=a.start||0);
+  const add = (id,v) => { if (id!=null && b[id]!==undefined) b[id]+=v; };
+  D.ops.forEach(o=>{
+    if (o.kind==="inc") add(o.acc, o.amount);
+    if (o.kind==="exp") add(o.acc, -o.amount);
+    if (o.kind==="tr") { add(o.acc, -o.amount); add(o.to, o.amountTo!=null?o.amountTo:o.amount); }
+  });
+  D.debts.forEach(x=>{
+    const s = x.dir==="gave" ? -1 : 1;
+    add(x.acc, s*x.amount);
+    x.pays.forEach(p=>add(p.acc, -s*p.amount));
+  });
+  D.loans.forEach(l=>l.pays.forEach(p=>add(p.acc, -p.amount)));
+  return b;
+}
+const toUZS = (n,c) => c==="USD" ? n*D.rate : n;
+
+/* --- qarz va kredit holati --- */
+function debtInfo(x){
+  const paid = sum(x.pays,p=>p.amount), rem = Math.max(0, x.amount-paid);
+  const left = x.due ? dnum(x.due)-dnum(today()) : null;
+  return {paid, rem, left};
+}
+function dueBadge(rem, left, doneText){
+  if (rem<=0) return `<span class="bdg ok">${doneText||"Yopilgan"}</span>`;
+  if (left===null) return "";
+  if (left<0) return `<span class="bdg bad">${-left} kun o'tib ketdi</span>`;
+  if (left===0) return `<span class="bdg bad">Bugun muddat</span>`;
+  if (left<=3) return `<span class="bdg warn">${left} kun qoldi</span>`;
+  return `<span class="bdg">${left} kun qoldi</span>`;
+}
+function loanInfo(l){
+  const paid = sum(l.pays,p=>p.amount), rem = Math.max(0, l.total-paid);
+  const t = today(), mk = t.slice(0,7);
+  const paidThisMonth = sum(l.pays.filter(p=>!p.pre && p.date.startsWith(mk)), p=>p.amount);
+  const lastDay = new Date(+mk.slice(0,4), +mk.slice(5,7), 0).getDate();
+  let due = mk+"-"+String(Math.min(l.day,lastDay)).padStart(2,"0");
+  let monthDone = paidThisMonth >= Math.min(l.monthly, rem+paidThisMonth);
+  if (monthDone) { // keyingi oy
+    const n = new Date(+mk.slice(0,4), +mk.slice(5,7), 1), nk = monthKey(n);
+    const nl = new Date(n.getFullYear(), n.getMonth()+1, 0).getDate();
+    due = nk+"-"+String(Math.min(l.day,nl)).padStart(2,"0");
+  }
+  const left = dnum(due)-dnum(t);
+  const nextAmt = Math.min(l.monthly, rem);
+  const monthsLeft = l.monthly ? Math.ceil(rem/l.monthly) : 0;
+  return {paid, rem, due, left, monthDone, nextAmt, monthsLeft, paidThisMonth};
+}
+function loanBadge(i){
+  if (i.rem<=0) return `<span class="bdg ok">To'liq yopilgan</span>`;
+  if (i.monthDone) return `<span class="bdg ok">Bu oy to'langan · keyingisi ${fd(i.due)}</span>`;
+  return dueBadge(i.rem, i.left);
+}
+
+/* ================= Saqlash: Telegram bulut + telefon xotirasi ================= */
+const CS = tg && tg.CloudStorage && tg.isVersionAtLeast && tg.isVersionAtLeast("6.9") ? tg.CloudStorage : null;
+const CHUNK = 3800, LS = "shaxsiy_v1", KP = "p"; // do'kon ilovasidan alohida kalitlar
+const csGet = keys => new Promise(r => CS.getItems(keys,(e,v)=>r(e?{}:v||{})));
+const csSet = (k,v) => new Promise(r => CS.setItem(k,v,()=>r()));
+const csDel = keys => new Promise(r => keys.length ? CS.removeItems(keys,()=>r()) : r());
+
+async function load(){
+  try { const s=localStorage.getItem(LS); D = normalize(s?JSON.parse(s):{}); } catch(e){ D = normalize({}); }
+  render();
+  if (!CS) return;
+  try {
+    const n = parseInt((await csGet([KP+"n"]))[KP+"n"]||"0");
+    if (!n) return;
+    const keys = Array.from({length:n},(_,i)=>KP+i);
+    const parts = await csGet(keys);
+    D = normalize(JSON.parse(keys.map(k=>parts[k]||"").join("")));
+    try { localStorage.setItem(LS, JSON.stringify(D)); } catch(e){}
+    render();
+  } catch(e){}
+}
+let saving = Promise.resolve();
+function save(){
+  const s = JSON.stringify(D);
+  try { localStorage.setItem(LS, s); } catch(e){}
+  if (!CS) return;
+  saving = saving.then(async()=>{
+    try {
+      const old = parseInt((await csGet([KP+"n"]))[KP+"n"]||"0");
+      const chunks = s.match(new RegExp(".{1,"+CHUNK+"}","gs")) || [""];
+      for (let i=0;i<chunks.length;i++) await csSet(KP+i, chunks[i]);
+      await csSet(KP+"n", String(chunks.length));
+      const extra=[]; for (let i=chunks.length;i<old;i++) extra.push(KP+i);
+      await csDel(extra);
+    } catch(e){}
+  });
+}
+
+/* ================= Sahifalar ================= */
+function render(){
+  document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on", b.dataset.t===tab));
+  $("page").innerHTML = ({home:pHome, ops:pOps, debt:pDebt, loan:pLoan})[tab]();
+}
+const monthBar = () => `<div class="month"><button data-act="mnav" data-d="-1">‹</button><span>${MONTHS[cur.getMonth()]} ${cur.getFullYear()}</span><button data-act="mnav" data-d="1">›</button></div>`;
+const monthTotals = mk => {
+  const r = {inc:{UZS:0,USD:0}, exp:{UZS:0,USD:0}};
+  D.ops.filter(o=>(o.kind==="inc"||o.kind==="exp")&&o.date.startsWith(mk)).forEach(o=>r[o.kind][accCur(o.acc)]+=o.amount);
+  return r;
+};
+const both = (o, cls) => `${o.UZS||!o.USD?`<b class="${cls||""}">${money(o.UZS,"UZS")}</b>`:""}${o.USD?`<b class="${cls||""}">${o.UZS?" + ":""}${money(o.USD,"USD")}</b>`:""}`;
+
+function pHome(){
+  const b = balances();
+  const tot = {UZS:0, USD:0}; D.accs.forEach(a=>tot[a.cur]+=b[a.id]);
+  const worth = tot.UZS + tot.USD*D.rate;
+  const dOpen = D.debts.map(x=>({x,i:debtInfo(x)})).filter(y=>y.i.rem>0);
+  const gave = {UZS:0,USD:0}, took = {UZS:0,USD:0};
+  dOpen.forEach(y=>(y.x.dir==="gave"?gave:took)[y.x.cur]+=y.i.rem);
+  const loans = D.loans.map(l=>({l,i:loanInfo(l)})).filter(y=>y.i.rem>0);
+  const loanRem = {UZS:0,USD:0}; loans.forEach(y=>loanRem[y.l.cur]+=y.i.rem);
+  const warn = [
+    ...dOpen.filter(y=>y.i.left!==null && y.i.left<=3).map(y=>({left:y.i.left, html:`
+      <div class="item" data-act="debtOpen" data-id="${y.x.id}"><div class="mid"><div>${y.x.dir==="gave"?"🤲 Qaytarishi kerak":"🙏 Qaytarishim kerak"}: ${esc(y.x.name)}</div>${dueBadge(y.i.rem,y.i.left)}</div><div class="amt ${y.x.dir==="gave"?"green":"red"}">${money(y.i.rem,y.x.cur)}</div></div>`})),
+    ...loans.filter(y=>!y.i.monthDone && y.i.left<=3).map(y=>({left:y.i.left, html:`
+      <div class="item" data-act="loanOpen" data-id="${y.l.id}"><div class="mid"><div>🏦 ${esc(y.l.name)}</div>${loanBadge(y.i)}</div><div class="amt red">${money(y.i.nextAmt-y.i.paidThisMonth>0?y.i.nextAmt-y.i.paidThisMonth:y.i.nextAmt,y.l.cur)}</div></div>`}))
+  ].sort((a,c)=>a.left-c.left);
+  const mt = monthTotals(monthKey(new Date()));
+
+  return `
+  <div class="card">
+    <div class="lbl">Umumiy boylik (1$ = ${fmt(D.rate)} so'm)</div>
+    <div class="big">${money(worth,"UZS")}</div>
+    <div class="grid">
+      <div class="mini"><small>So'mda</small><b>${money(tot.UZS,"UZS")}</b></div>
+      <div class="mini"><small>Dollarda</small><b>${money(tot.USD,"USD")}</b></div>
+    </div>
+  </div>
+
+  ${warn.length ? `<div class="card"><h3>⚠️ Muddati yaqin to'lovlar</h3>${warn.map(w=>w.html).join("")}</div>` : ""}
+
+  <div class="card">
+    <h3><span>Hisoblar</span></h3>
+    ${D.accs.map(a=>`<div class="line" data-act="accEdit" data-id="${a.id}"><span>${esc(a.name)}</span><b class="${b[a.id]<0?"red":""}">${money(b[a.id],a.cur)}</b></div>`).join("")}
+    <div class="row2" style="margin-top:10px">
+      <button class="addbtn ghost" style="background:var(--bg2);margin:0" data-act="trNew">↔ O'tkazma / ayirboshlash</button>
+    </div>
+    <div class="row2" style="margin-top:8px">
+      <button class="addbtn ghost" style="background:var(--bg2);margin:0" data-act="accNew">+ Hisob</button>
+      <button class="addbtn ghost" style="background:var(--bg2);margin:0" data-act="rateEdit">💱 Dollar kursi</button>
+    </div>
+  </div>
+
+  <div class="row2"><button class="addbtn" style="background:var(--green)" data-act="incNew">+ Kirim</button><button class="addbtn" style="background:var(--red)" data-act="expNew">− Chiqim</button></div>
+
+  <div class="card">
+    <h3>${MONTHS[new Date().getMonth()]} oyi</h3>
+    <div class="line"><span>Kirim</span><span>${both(mt.inc,"green")}</span></div>
+    <div class="line"><span>Chiqim</span><span>${both(mt.exp,"red")}</span></div>
+  </div>
+
+  <div class="card">
+    <h3>Qarzlar va kreditlar</h3>
+    <div class="line" data-act="tab" data-t="debt"><span>🤲 Menga qaytarishlari kerak</span><span>${both(gave,"green")}</span></div>
+    <div class="line" data-act="tab" data-t="debt"><span>🙏 Men qaytarishim kerak</span><span>${both(took,"red")}</span></div>
+    <div class="line" data-act="tab" data-t="loan"><span>🏦 Kreditlar qoldig'i</span><span>${both(loanRem,"red")}</span></div>
+  </div>`;
+}
+
+function pOps(){
+  const mk = monthKey(cur);
+  let list = D.ops.filter(o=>o.date.startsWith(mk)).sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id);
+  const mt = monthTotals(mk);
+  const exps = list.filter(o=>o.kind==="exp");
+  const byCat = {}; exps.forEach(o=>byCat[o.cat]=(byCat[o.cat]||0)+toUZS(o.amount,accCur(o.acc)));
+  const cats = Object.entries(byCat).sort((a,b)=>b[1]-a[1]); const ct = sum(cats,c=>c[1]);
+  if (opFilter!=="all") list = list.filter(o=>o.kind===opFilter);
+  return `${monthBar()}
+  <div class="row2"><button class="addbtn" style="background:var(--green)" data-act="incNew">+ Kirim</button><button class="addbtn" style="background:var(--red)" data-act="expNew">− Chiqim</button></div>
+  <div class="card">
+    <div class="grid">
+      <div class="mini"><small>Kirim</small><b class="green">${money(mt.inc.UZS,"UZS")}${mt.inc.USD?` + ${money(mt.inc.USD,"USD")}`:""}</b></div>
+      <div class="mini"><small>Chiqim</small><b class="red">${money(mt.exp.UZS,"UZS")}${mt.exp.USD?` + ${money(mt.exp.USD,"USD")}`:""}</b></div>
+    </div>
+    ${cats.length?`<h3 style="margin-top:14px">Chiqimlar turlari bo'yicha</h3>`:""}
+    ${cats.map(([c,v])=>`<div class="bar"><div class="top"><span>${esc(c)}</span><span>${fmt(v)} · ${Math.round(v/ct*100)}%</span></div><div class="track"><div class="fill" style="width:${v/ct*100}%"></div></div></div>`).join("")}
+  </div>
+  <div class="filters">
+    ${[["all","Hammasi"],["inc","Kirim"],["exp","Chiqim"],["tr","O'tkazma"]].map(([v,l])=>`<button class="${opFilter===v?"on":""}" data-act="opF" data-v="${v}">${l}</button>`).join("")}
+  </div>
+  <div class="card">
+    ${list.length ? list.map(o=> o.kind==="tr" ? `
+      <div class="item" data-act="trEdit" data-id="${o.id}">
+        <div class="ico">↔</div>
+        <div class="mid"><div>${esc(accName(o.acc))} → ${esc(accName(o.to))}</div><small>${fd(o.date)}${o.note?" · "+esc(o.note):""}</small></div>
+        <div class="amt">${money(o.amount,accCur(o.acc))}${o.amountTo!=null&&accCur(o.to)!==accCur(o.acc)?`<small>${money(o.amountTo,accCur(o.to))}</small>`:""}</div>
+      </div>` : `
+      <div class="item" data-act="opEdit" data-id="${o.id}">
+        <div class="ico">${o.kind==="inc"?"➕":"➖"}</div>
+        <div class="mid"><div>${esc(o.cat)}</div><small>${fd(o.date)} · ${esc(accName(o.acc))}${o.note?" · "+esc(o.note):""}</small></div>
+        <div class="amt ${o.kind==="inc"?"green":"red"}">${o.kind==="inc"?"+":"−"}${money(o.amount,accCur(o.acc))}</div>
+      </div>`).join("") : `<div class="empty">Bu oyda yozuv yo'q</div>`}
+  </div>`;
+}
+
+function pDebt(){
+  const all = D.debts.map(x=>({x,i:debtInfo(x)}));
+  const open = all.filter(y=>y.i.rem>0);
+  const gave = {UZS:0,USD:0}, took = {UZS:0,USD:0};
+  open.forEach(y=>(y.x.dir==="gave"?gave:took)[y.x.cur]+=y.i.rem);
+  let list = debtFilter==="open" ? open : debtFilter==="gave" ? all.filter(y=>y.x.dir==="gave") : debtFilter==="took" ? all.filter(y=>y.x.dir==="took") : all;
+  list = list.sort((a,b)=>(b.i.rem>0)-(a.i.rem>0) || ((a.i.left??9999)-(b.i.left??9999)) || b.x.date.localeCompare(a.x.date));
+  return `
+  <div class="card">
+    <div class="grid">
+      <div class="mini"><small>🤲 Menga qaytarishlari kerak</small><b class="green">${money(gave.UZS,"UZS")}</b>${gave.USD?`<b class="green">${money(gave.USD,"USD")}</b>`:""}</div>
+      <div class="mini"><small>🙏 Men qaytarishim kerak</small><b class="red">${money(took.UZS,"UZS")}</b>${took.USD?`<b class="red">${money(took.USD,"USD")}</b>`:""}</div>
+    </div>
+  </div>
+  <div class="row2"><button class="addbtn" data-act="debtNew" data-dir="gave">🤲 Qarz berdim</button><button class="addbtn" data-act="debtNew" data-dir="took">🙏 Qarz oldim</button></div>
+  <div class="filters">
+    ${[["open","Ochiq"],["gave","Bergan"],["took","Olgan"],["all","Hammasi"]].map(([v,l])=>`<button class="${debtFilter===v?"on":""}" data-act="debtF" data-v="${v}">${l}</button>`).join("")}
+  </div>
+  <div class="card">
+    ${list.length ? list.map(y=>`
+      <div class="item" data-act="debtOpen" data-id="${y.x.id}">
+        <div class="ico">${y.x.dir==="gave"?"🤲":"🙏"}</div>
+        <div class="mid"><div>${esc(y.x.name)}</div><small>${y.x.dir==="gave"?"Berdim":"Oldim"}: ${fd(y.x.date)}${y.x.due?` · muddat ${fd(y.x.due)}`:""}</small>${dueBadge(y.i.rem,y.i.left)}</div>
+        <div class="amt ${y.i.rem>0?(y.x.dir==="gave"?"green":"red"):""}">${money(y.i.rem>0?y.i.rem:y.x.amount,y.x.cur)}${y.i.paid>0&&y.i.rem>0?`<small>${money(y.x.amount,y.x.cur)} dan</small>`:""}</div>
+      </div>`).join("") : `<div class="empty">${debtFilter==="open"?"Ochiq qarz yo'q 👍":"Yozuv yo'q"}</div>`}
+  </div>`;
+}
+
+function pLoan(){
+  const all = D.loans.map(l=>({l,i:loanInfo(l)}));
+  const open = all.filter(y=>y.i.rem>0);
+  const monthNeed = {UZS:0,USD:0}; open.forEach(y=>{ if(!y.i.monthDone) monthNeed[y.l.cur]+=Math.max(0,y.i.nextAmt-y.i.paidThisMonth); });
+  const remT = {UZS:0,USD:0}; open.forEach(y=>remT[y.l.cur]+=y.i.rem);
+  return `
+  <div class="card">
+    <div class="grid">
+      <div class="mini"><small>Bu oy to'lash kerak</small><b class="red">${money(monthNeed.UZS,"UZS")}</b>${monthNeed.USD?`<b class="red">${money(monthNeed.USD,"USD")}</b>`:""}</div>
+      <div class="mini"><small>Jami qolgan qarz</small><b>${money(remT.UZS,"UZS")}</b>${remT.USD?`<b>${money(remT.USD,"USD")}</b>`:""}</div>
+    </div>
+  </div>
+  <button class="addbtn" data-act="loanNew">+ Kredit / bo'lib to'lash qo'shish</button>
+  <div class="card">
+    ${all.length ? all.sort((a,b)=>(b.i.rem>0)-(a.i.rem>0) || a.i.left-b.i.left).map(y=>`
+      <div class="item" data-act="loanOpen" data-id="${y.l.id}">
+        <div class="ico">🏦</div>
+        <div class="mid"><div>${esc(y.l.name)}</div><small>Oyiga ${money(y.l.monthly,y.l.cur)} · har oy ${y.l.day}-sanada${y.i.rem>0?` · ${y.i.monthsLeft} oy qoldi`:""}</small>${loanBadge(y.i)}
+          <div class="progress"><div style="width:${y.l.total?Math.min(100,y.i.paid/y.l.total*100):0}%"></div></div></div>
+        <div class="amt">${money(y.i.rem,y.l.cur)}<small>qoldi</small></div>
+      </div>`).join("") : `<div class="empty">Kredit qo'shilmagan</div>`}
+  </div>`;
+}
+
+/* ================= Oynalar ================= */
+let sheetCur = null, sheetStack = [], tabHist = [], pendingOpener = null;
+const sheetOpen = () => $("sheetBg").classList.contains("show");
+function openSheet(html){
+  F.onChip = null;
+  if (pendingOpener) {
+    const at = sheetStack.findIndex(x=>x.key===pendingOpener.key);
+    if (at>=0) sheetStack = sheetStack.slice(0, at);
+    else if (sheetOpen() && sheetCur && sheetCur.key !== pendingOpener.key && !pendingOpener.back) sheetStack.push(sheetCur);
+    if (!sheetOpen()) sheetStack = [];
+    sheetCur = pendingOpener; pendingOpener = null;
+  }
+  $("sheet").innerHTML = html; $("sheetBg").classList.add("show"); $("sheet").scrollTop=0; updateBack();
+}
+function closeSheet(){ $("sheetBg").classList.remove("show"); sheetCur=null; sheetStack=[]; updateBack(); }
+function goBack(){
+  if (sheetOpen()) {
+    const prev = sheetStack.pop();
+    if (prev) { pendingOpener = {...prev, back:true}; prev.fn(...prev.args); } else closeSheet();
+    return updateBack();
+  }
+  if (tabHist.length) { tab = tabHist.pop(); window.scrollTo(0,0); render(); }
+  updateBack();
+}
+const canBack = () => sheetOpen() || tabHist.length>0;
+function updateBack(){
+  const on = canBack();
+  const tb = tg && tg.BackButton && tg.isVersionAtLeast && tg.isVersionAtLeast("6.1") ? tg.BackButton : null;
+  if (tb) { on ? tb.show() : tb.hide(); } else $("backBtn").style.display = on ? "flex" : "none";
+}
+
+const field = (l,inner) => `<label>${l}</label>${inner}`;
+const numIn = (id,v) => `<input class="num" id="${id}" inputmode="numeric" placeholder="0" value="${v?fmt(v):""}">`;
+const dateIn = (id,v) => `<input id="${id}" type="date" value="${v||today()}">`;
+const textIn = (id,v,ph,list) => `<input id="${id}" value="${esc(v)}" placeholder="${ph||""}" ${list?`list="${list}"`:""} autocomplete="off">`;
+function chips(name, opts, sel){ F[name]=sel; return `<div class="chips" data-chip="${name}">${opts.map(([v,l])=>`<button type="button" data-v="${esc(v)}" class="${String(v)===String(sel)?"on":""}">${l}</button>`).join("")}</div>`; }
+const accChips = (name, sel, curFilter) => chips(name, D.accs.filter(a=>!curFilter||a.cur===curFilter).map(a=>[a.id, `${esc(a.name)}${a.cur==="USD"?" ($)":""}`]), sel);
+const firstAcc = c => (D.accs.find(a=>!c||a.cur===c)||D.accs[0]||{}).id;
+const actions = del => `<div class="actions"><button class="cancel" id="cancelBtn">Bekor</button><button class="save" id="saveBtn">Saqlash</button></div>${del?`<button class="del" id="delBtn">O'chirish</button>`:""}`;
+function bind(onSave, onDel){
+  $("cancelBtn").onclick = closeSheet;
+  $("saveBtn").onclick = onSave;
+  if (onDel && $("delBtn")) $("delBtn").onclick = () => ask("O'chirishni tasdiqlaysizmi?", ()=>{ onDel(); done(); });
+}
+function ask(msg, yes){ if (tg && tg.showConfirm && tg.isVersionAtLeast("6.2")) tg.showConfirm(msg, ok=>ok&&yes()); else if (confirm(msg)) yes(); }
+function alertMsg(m){ if (tg && tg.showAlert && tg.isVersionAtLeast("6.2")) tg.showAlert(m); else alert(m); }
+function bad(id){ haptic("error"); const el=$(id); if(el){ el.focus(); el.style.outline="2px solid var(--red)"; setTimeout(()=>el.style.outline="",1200);} }
+function done(keepOpen){ haptic("success"); if(!keepOpen) closeSheet(); save(); render(); }
+const names = arr => [...new Set(arr)].sort().map(n=>`<option value="${esc(n)}">`).join("");
+
+/* --- Kirim / chiqim --- */
+function opSheet(id, kind){
+  const o = id ? D.ops.find(x=>x.id===id) : null;
+  kind = o ? o.kind : kind;
+  const cats = kind==="inc" ? INC_CATS : EXP_CATS;
+  openSheet(`<h2>${o?"Tahrirlash":kind==="inc"?"Yangi kirim":"Yangi chiqim"}</h2>
+    ${field("Summa", numIn("fAmt", o&&o.amount))}
+    ${field("Hisob", accChips("acc", o?o.acc:firstAcc()))}
+    ${field("Turi", chips("cat", cats.map(c=>[c,c]), o?o.cat:(kind==="inc"?cats[0]:"Boshqa")))}
+    ${field("Sana", dateIn("fDate", o&&o.date))}
+    ${field("Izoh", textIn("fNote", o?o.note:"", "ixtiyoriy"))}
+    ${actions(!!o)}`);
+  bind(()=>{
+    const amount = num("fAmt"); if (!amount) return bad("fAmt");
+    const r = {kind, amount, acc:+F.acc, cat:F.cat, date:$("fDate").value||today(), note:$("fNote").value.trim()};
+    if (o) Object.assign(o,r); else D.ops.push({id:uid(), ...r});
+    done();
+  }, o && (()=>{ D.ops=D.ops.filter(x=>x!==o); }));
+}
+
+/* --- O'tkazma / ayirboshlash --- */
+function trSheet(id){
+  const o = id ? D.ops.find(x=>x.id===id) : null;
+  const dflFrom = o ? o.acc : firstAcc("UZS"), dflTo = o ? o.to : (D.accs.find(a=>a.id!==dflFrom)||{}).id;
+  openSheet(`<h2>O'tkazma / ayirboshlash</h2>
+    <div class="lbl" style="margin-top:4px">Masalan: kartadan naqd yechdingiz yoki so'mni dollarga almashtirdingiz.</div>
+    ${field("Qayerdan", accChips("from", dflFrom))}
+    ${field("Qayerga", accChips("to", dflTo))}
+    ${field("Summa", numIn("fAmt", o&&o.amount))}
+    <div id="fxBox" style="display:none">${field("Qabul qilingan summa", numIn("fAmtTo", o&&o.amountTo))}<div class="lbl" id="fxRate" style="margin-top:6px"></div></div>
+    ${field("Sana", dateIn("fDate", o&&o.date))}
+    ${field("Izoh", textIn("fNote", o?o.note:"", "ixtiyoriy"))}
+    ${actions(!!o)}`);
+  const fx = () => {
+    const diff = accCur(F.from)!==accCur(F.to);
+    $("fxBox").style.display = diff ? "block" : "none";
+    if (diff) {
+      const a=num("fAmt"), b=num("fAmtTo");
+      if (a && !b && !o) { $("fAmtTo").value = fmt(accCur(F.from)==="UZS" ? a/D.rate : a*D.rate); }
+      const a2=num("fAmt"), b2=num("fAmtTo");
+      $("fxRate").textContent = a2&&b2 ? `Kurs: 1$ = ${fmt(accCur(F.from)==="UZS"?a2/b2:b2/a2)} so'm` : "";
+    }
+  };
+  F.onChip = fx; $("fAmt").addEventListener("input", fx); $("fAmtTo").addEventListener("input", fx); fx();
+  bind(()=>{
+    const amount = num("fAmt"); if (!amount) return bad("fAmt");
+    if (String(F.from)===String(F.to)) { alertMsg("Ikki xil hisob tanlang"); return; }
+    const diff = accCur(F.from)!==accCur(F.to);
+    const amountTo = diff ? num("fAmtTo") : null; if (diff && !amountTo) return bad("fAmtTo");
+    const r = {kind:"tr", amount, amountTo, acc:+F.from, to:+F.to, date:$("fDate").value||today(), note:$("fNote").value.trim()};
+    if (o) Object.assign(o,r); else D.ops.push({id:uid(), ...r});
+    if (diff) { const rate = accCur(F.from)==="UZS" ? amount/amountTo : amountTo/amount; if (rate>1000) D.rate = Math.round(rate); }
+    done();
+  }, o && (()=>{ D.ops=D.ops.filter(x=>x!==o); }));
+}
+
+/* --- Hisoblar --- */
+function accSheet(id){
+  const a = id ? D.accs.find(x=>x.id===id) : null;
+  const used = a && (D.ops.some(o=>o.acc===a.id||o.to===a.id) || D.debts.some(x=>x.acc===a.id||x.pays.some(p=>p.acc===a.id)) || D.loans.some(l=>l.pays.some(p=>p.acc===a.id)));
+  openSheet(`<h2>${a?"Hisobni tahrirlash":"Yangi hisob"}</h2>
+    ${field("Nomi", textIn("aName", a?a.name:"", "masalan: 💳 Humo karta"))}
+    ${field("Valyuta", chips("cur", [["UZS","So'm"],["USD","Dollar"]], a?a.cur:"UZS"))}
+    ${field("Boshlang'ich qoldiq (ilovani boshlagan paytdagi pul)", numIn("aStart", a&&a.start))}
+    ${actions(!!a && !used)}
+    ${used?`<div class="lbl" style="text-align:center;margin-top:8px">Yozuvlari bor hisobni o'chirib bo'lmaydi</div>`:""}`);
+  bind(()=>{
+    const name = $("aName").value.trim(); if (!name) return bad("aName");
+    const r = {name, cur:F.cur, start:num("aStart")};
+    if (a) Object.assign(a,r); else D.accs.push({id:uid(), ...r});
+    done();
+  }, a && !used && (()=>{ D.accs=D.accs.filter(x=>x!==a); }));
+}
+function rateSheet(){
+  openSheet(`<h2>Dollar kursi</h2>
+    <div class="lbl" style="margin-top:4px">Umumiy boylikni so'mda hisoblash uchun. Dollar ayirboshlaganingizda kurs o'zi yangilanadi.</div>
+    ${field("1$ = necha so'm", numIn("rRate", D.rate))}
+    ${actions(false)}`);
+  bind(()=>{ const r=num("rRate"); if (!r) return bad("rRate"); D.rate=r; done(); });
+}
+
+/* --- Qarzlar --- */
+function debtSheet(id, dir){
+  const x = id ? D.debts.find(d=>d.id===id) : null;
+  dir = x ? x.dir : dir;
+  if (x) {
+    const i = debtInfo(x);
+    openSheet(`<h2>${esc(x.name)}</h2>${dueBadge(i.rem,i.left)}
+      <div class="box">
+        <div class="line"><span>${dir==="gave"?"Men berdim":"Men oldim"}</span><b>${money(x.amount,x.cur)}</b></div>
+        <div class="line"><span>Qaytarildi</span><b class="green">${money(i.paid,x.cur)}</b></div>
+        <div class="line"><span>Qoldi</span><b class="${i.rem>0?(dir==="gave"?"green":"red"):""}">${money(i.rem,x.cur)}</b></div>
+        <div class="line"><span>Sana</span><b>${fd(x.date)}</b></div>
+        ${x.due?`<div class="line"><span>Qaytarish muddati</span><b>${fd(x.due)}</b></div>`:""}
+        ${x.note?`<div class="line"><span>Izoh</span><b>${esc(x.note)}</b></div>`:""}
+      </div>
+      ${x.pays.length?`<h4>Qaytarilganlar</h4><div class="box">${x.pays.map(p=>`<div class="line"><span>${fd(p.date)} · ${esc(accName(p.acc))}</span><span><b>${money(p.amount,x.cur)}</b><button class="x" data-pdel="${p.id}">×</button></span></div>`).join("")}</div>`:""}
+      ${i.rem>0?`<h4>${dir==="gave"?"Qarzini qaytardi":"Qarzimni qaytardim"}</h4>
+        ${numIn("pAmt", i.rem)}
+        ${field(dir==="gave"?"Qaysi hisobga tushdi":"Qaysi hisobdan berdim", accChips("pacc", firstAcc(x.cur), x.cur))}
+        ${field("Sana", dateIn("pDate"))}
+        <div class="actions"><button class="save" id="payBtn">Saqlash</button></div>`:""}
+      <h4>Tahrirlash</h4>
+      ${field("Kim", textIn("fName", x.name))}
+      ${field("Summa", numIn("fAmt", x.amount))}
+      ${field("Qaytarish muddati (ixtiyoriy)", `<input id="fDue" type="date" value="${x.due||""}">`)}
+      ${field("Izoh", textIn("fNote", x.note))}
+      ${actions(true)}`);
+    if ($("payBtn")) $("payBtn").onclick = ()=>{
+      const a = num("pAmt"); if (!a) return bad("pAmt");
+      if (a > i.rem) { alertMsg(`Qolgan qarz ${money(i.rem,x.cur)}`); return bad("pAmt"); }
+      x.pays.push({id:uid(), amount:a, acc:+F.pacc, date:$("pDate").value||today()});
+      done(true); debtSheet(x.id);
+    };
+    $("sheet").querySelectorAll("[data-pdel]").forEach(b=>b.onclick=()=>ask("O'chirasizmi?",()=>{ x.pays=x.pays.filter(p=>p.id!==+b.dataset.pdel); done(true); debtSheet(x.id); }));
+    bind(()=>{
+      const name=$("fName").value.trim(); if(!name) return bad("fName");
+      const amount=num("fAmt"); if(!amount) return bad("fAmt");
+      Object.assign(x,{name, amount, due:$("fDue").value, note:$("fNote").value.trim()});
+      done();
+    }, ()=>{ D.debts=D.debts.filter(d=>d!==x); });
+    return;
+  }
+  openSheet(`<h2>${dir==="gave"?"🤲 Qarz berdim":"🙏 Qarz oldim"}</h2>
+    ${field("Kim", textIn("fName","","ism", "dnames"))}<datalist id="dnames">${names(D.debts.map(d=>d.name))}</datalist>
+    ${field("Valyuta", chips("cur", [["UZS","So'm"],["USD","Dollar"]], "UZS"))}
+    ${field("Summa", numIn("fAmt"))}
+    ${field(dir==="gave"?"Qaysi hisobdan berdim":"Qaysi hisobga tushdi", `<div id="accBox"></div>`)}
+    ${field("Sana", dateIn("fDate"))}
+    ${field("Qaytarish muddati (ixtiyoriy)", `<input id="fDue" type="date">`)}
+    ${field("Izoh", textIn("fNote","","ixtiyoriy"))}
+    ${actions(false)}`);
+  const drawAcc = () => { $("accBox").innerHTML = chips("acc", [["","Hisobga ta'sir qilmasin"]].concat(D.accs.filter(a=>a.cur===F.cur).map(a=>[a.id, esc(a.name)])), firstAcc(F.cur)||""); };
+  F.onChip = n => { if (n==="cur") drawAcc(); }; drawAcc();
+  bind(()=>{
+    const name=$("fName").value.trim(); if(!name) return bad("fName");
+    const amount=num("fAmt"); if(!amount) return bad("fAmt");
+    D.debts.push({id:uid(), dir, name, cur:F.cur, amount, acc:F.acc?+F.acc:null, date:$("fDate").value||today(), due:$("fDue").value, note:$("fNote").value.trim(), pays:[]});
+    done();
+  });
+}
+
+/* --- Kredit --- */
+function loanSheet(id){
+  const l = id ? D.loans.find(x=>x.id===id) : null;
+  let top = "";
+  if (l) {
+    const i = loanInfo(l);
+    top = `${loanBadge(i)}
+      <div class="box">
+        <div class="line"><span>Jami qarz</span><b>${money(l.total,l.cur)}</b></div>
+        <div class="line"><span>To'langan</span><b class="green">${money(i.paid,l.cur)}</b></div>
+        <div class="line"><span>Qolgan</span><b class="red">${money(i.rem,l.cur)}</b></div>
+        <div class="line"><span>Oylik to'lov</span><b>${money(l.monthly,l.cur)} · ${l.day}-sana</b></div>
+        ${i.rem>0?`<div class="line"><span>Keyingi to'lov</span><b>${fd(i.due)}</b></div><div class="line"><span>Qolgan oylar</span><b>~${i.monthsLeft} oy</b></div>`:""}
+      </div>
+      ${l.pays.length?`<h4>To'lovlar</h4><div class="box">${l.pays.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(p=>`<div class="line"><span>${fd(p.date)} · ${esc(accName(p.acc))}</span><span><b>${money(p.amount,l.cur)}</b><button class="x" data-pdel="${p.id}">×</button></span></div>`).join("")}</div>`:""}
+      ${i.rem>0?`<h4>To'lov qilish</h4>
+        ${numIn("pAmt", Math.min(l.monthly, i.rem))}
+        ${field("Qaysi hisobdan", accChips("pacc", firstAcc(l.cur), l.cur))}
+        ${field("Sana", dateIn("pDate"))}
+        <div class="actions"><button class="save" id="payBtn">To'lovni saqlash</button></div>`:""}
+      <h4>Ma'lumotlar</h4>`;
+  }
+  openSheet(`<h2>${l?esc(l.name):"Yangi kredit / bo'lib to'lash"}</h2>${top}
+    ${field("Nomi", textIn("lName", l?l.name:"", "masalan: Telefon (Uzum Nasiya)"))}
+    ${field("Valyuta", chips("cur", [["UZS","So'm"],["USD","Dollar"]], l?l.cur:"UZS"))}
+    ${field("Jami to'lanadigan summa (foizi bilan)", numIn("lTotal", l&&l.total))}
+    ${field("Oylik to'lov", numIn("lMonthly", l&&l.monthly))}
+    ${field("Har oyning nechanchi sanasida to'lanadi", `<input id="lDay" inputmode="numeric" value="${l?l.day:""}" placeholder="masalan: 10">`)}
+    ${l?"":field("Oldin to'lab bo'lingan summa (bo'lsa)", numIn("lPaid"))}
+    ${actions(!!l)}`);
+  if (l) {
+    if ($("payBtn")) $("payBtn").onclick = ()=>{
+      const a = num("pAmt"); if (!a) return bad("pAmt");
+      l.pays.push({id:uid(), amount:a, acc:+F.pacc, date:$("pDate").value||today()});
+      done(true); loanSheet(l.id);
+    };
+    $("sheet").querySelectorAll("[data-pdel]").forEach(b=>b.onclick=()=>ask("To'lovni o'chirasizmi?",()=>{ l.pays=l.pays.filter(p=>p.id!==+b.dataset.pdel); done(true); loanSheet(l.id); }));
+  }
+  bind(()=>{
+    const name=$("lName").value.trim(); if(!name) return bad("lName");
+    const total=num("lTotal"); if(!total) return bad("lTotal");
+    const monthly=num("lMonthly"); if(!monthly) return bad("lMonthly");
+    const day=Math.min(31,Math.max(1,num("lDay")||1));
+    if (l) Object.assign(l,{name, cur:F.cur, total, monthly, day});
+    else {
+      const pre = num("lPaid");
+      D.loans.push({id:uid(), name, cur:F.cur, total, monthly, day, start:today(), pays: pre ? [{id:uid(), amount:pre, acc:null, date:today(), pre:true}] : []});
+    }
+    done();
+  }, l && (()=>{ D.loans=D.loans.filter(x=>x!==l); }));
+}
+
+/* ================= Hodisalar ================= */
+document.addEventListener("input", e=>{
+  if (e.target.classList.contains("num")) {
+    const d = e.target.value.replace(/\D/g,"").slice(0,13);
+    e.target.value = d ? fmt(+d) : "";
+  }
+});
+document.addEventListener("click", e=>{
+  const chip = e.target.closest("[data-chip] button");
+  if (chip) {
+    const box = chip.parentElement, n = box.dataset.chip, v = chip.dataset.v;
+    box.querySelectorAll("button").forEach(b=>b.classList.toggle("on", b===chip));
+    F[n] = v; F.onChip && F.onChip(n,v);
+    return;
+  }
+  const el = e.target.closest("[data-act]"); if (!el) return;
+  const a = el.dataset.act, id = +el.dataset.id;
+  if (a==="tab") {
+    if (el.closest("nav")) tabHist = el.dataset.t==="home" ? [] : ["home"];
+    else if (el.dataset.t!==tab) tabHist.push(tab);
+    tab = el.dataset.t; window.scrollTo(0,0); render(); updateBack();
+  }
+  else if (a==="mnav") { cur.setMonth(cur.getMonth() + +el.dataset.d); render(); }
+  else if (a==="incNew") opSheet(null, "inc");
+  else if (a==="expNew") opSheet(null, "exp");
+  else if (a==="opEdit") opSheet(id);
+  else if (a==="trNew") trSheet();
+  else if (a==="trEdit") trSheet(id);
+  else if (a==="opF") { opFilter = el.dataset.v; render(); }
+  else if (a==="accNew") accSheet();
+  else if (a==="accEdit") accSheet(id);
+  else if (a==="rateEdit") rateSheet();
+  else if (a==="debtNew") debtSheet(null, el.dataset.dir);
+  else if (a==="debtOpen") debtSheet(id);
+  else if (a==="debtF") { debtFilter = el.dataset.v; render(); }
+  else if (a==="loanNew") loanSheet();
+  else if (a==="loanOpen") loanSheet(id);
+});
+$("sheetBg").addEventListener("click", e=>{ if (e.target.id==="sheetBg") closeSheet(); });
+
+const _wrap = (name, fn) => (...args) => { pendingOpener = {key: name+JSON.stringify(args), fn, args}; return fn(...args); };
+["opSheet","trSheet","accSheet","rateSheet","debtSheet","loanSheet"].forEach(n => { window[n] = _wrap(n, window[n]); });
+if (tg && tg.BackButton) tg.BackButton.onClick(goBack);
+$("backBtn").addEventListener("click", goBack);
+
+load();
+</script>
+</body>
+</html>

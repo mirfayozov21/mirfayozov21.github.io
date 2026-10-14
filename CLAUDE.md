@@ -44,6 +44,14 @@ Back button: Telegram `BackButton` (fallback `#backBtn` outside Telegram). Order
 (sheet functions are wrapped by `_wrap` to record a stack; reopening a sheet already in the stack truncates it) →
 close sheet → previous tab (any nav tab other than Asosiy goes back to Asosiy). New sheet functions must be added to the `_wrap` list.
 
+## Second app: shaxsiy/ (owner's personal finances)
+`shaxsiy/index.html` → https://mirfayozov21.github.io/shaxsiy/ — separate Telegram bot, same single-file style.
+Tabs: Asosiy (accounts in UZS/USD, net worth via `D.rate`), Kirim-chiqim (`kind:"inc"|"exp"|"tr"`; `tr` between
+different currencies stores `amountTo` and updates `D.rate`), Qarzlar (`D.debts` `{dir:"gave"|"took", cur, amount, acc?, due, pays}`),
+Kredit (`D.loans` `{total, monthly, day, cur, pays}`; pays with `pre:true` = paid before tracking, no account).
+`D = {accs, ops, debts, loans, rate}`; storage keys are separate from the shop app: localStorage `shaxsiy_v1`,
+CloudStorage `p0..pN` + `pn`. Do not share code paths/keys between the two apps.
+
 ## Working on it
 - Test in headless Chromium (Playwright) with `telegram.org` and `cdn.jsdelivr.net` routed to stubs;
   supabase.co is not reachable from the sandbox, so mock `window.supabase`.
