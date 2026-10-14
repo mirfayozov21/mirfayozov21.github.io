@@ -96,6 +96,7 @@ input.num{font-weight:700;font-size:18px}
 .thumb img{width:100%;height:100%;object-fit:cover;display:block}
 .thumb .rm{position:absolute;top:4px;right:4px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:26px;height:26px;font-size:16px;line-height:26px}
 label.photoBtn{display:block;text-align:center;padding:12px;border-radius:10px;border:2px dashed var(--hint);color:var(--btn);font-weight:600;font-size:15px;margin:4px 0 0}
+#backBtn{position:fixed;top:10px;left:10px;z-index:30;display:none;align-items:center;border:none;border-radius:20px;padding:8px 14px;font-size:15px;font-weight:600;background:var(--bg);color:var(--btn);box-shadow:0 2px 10px rgba(0,0,0,.15)}
 #viewer{position:fixed;inset:0;background:#000;z-index:20;display:none;align-items:center;justify-content:center}
 #viewer.show{display:flex}
 #viewer img{max-width:100%;max-height:100%;object-fit:contain}
@@ -117,6 +118,7 @@ label.photoBtn{display:block;text-align:center;padding:12px;border-radius:10px;b
 
 <div class="sheet-bg" id="sheetBg"><div class="sheet" id="sheet"></div></div>
 <div id="viewer"><img id="viewerImg" alt=""><button>✕</button></div>
+<button id="backBtn" aria-label="Orqaga">‹ Orqaga</button>
 
 <script>
 const tg = (window.Telegram && Telegram.WebApp) ? Telegram.WebApp : null;
@@ -181,7 +183,7 @@ async function uploadPhoto(file){
   return path;
 }
 function alertMsg(m){ if (tg && tg.showAlert && tg.isVersionAtLeast("6.2")) tg.showAlert(m); else alert(m); }
-function showPhoto(url){ $("viewerImg").src=url; $("viewer").classList.add("show"); }
+function showPhoto(url){ $("viewerImg").src=url; $("viewer").classList.add("show"); updateBack(); }
 const thumbsHtml = (list, rmAttr) => list.map((p,i)=>`<div class="thumb"><img src="${esc(photoUrl(p))}" data-view="${esc(photoUrl(p))}" loading="lazy" alt=""><button class="rm" ${rmAttr}="${i}">×</button></div>`).join("");
 const photoPicker = () => `<label class="photoBtn" id="photoLbl">📷 Rasm qo'shish<input type="file" accept="image/*" multiple id="fPhoto" hidden></label>`;
 
@@ -582,8 +584,40 @@ function pCust(){
 }
 
 /* ================= Oynalar (forma) ================= */
-function openSheet(html){ F.onChip=null; $("sheet").innerHTML = html; $("sheetBg").classList.add("show"); $("sheet").scrollTop=0; }
-function closeSheet(){ $("sheetBg").classList.remove("show"); }
+/* ---------- Orqaga qaytish ---------- */
+let sheetCur = null, sheetStack = [], tabHist = [], pendingOpener = null;
+const sheetOpen = () => $("sheetBg").classList.contains("show");
+function openSheet(html){
+  F.onChip=null;
+  if (pendingOpener) {
+    const at = sheetStack.findIndex(x=>x.key===pendingOpener.key);
+    if (at>=0) sheetStack = sheetStack.slice(0, at);
+    else if (sheetOpen() && sheetCur && sheetCur.key !== pendingOpener.key && !pendingOpener.back) sheetStack.push(sheetCur);
+    if (!sheetOpen()) sheetStack = [];
+    sheetCur = pendingOpener; pendingOpener = null;
+  }
+  $("sheet").innerHTML = html; $("sheetBg").classList.add("show"); $("sheet").scrollTop=0; updateBack();
+}
+function closeSheet(){ $("sheetBg").classList.remove("show"); sheetCur=null; sheetStack=[]; updateBack(); }
+function goBack(){
+  if ($("viewer").classList.contains("show")) { $("viewer").classList.remove("show"); return updateBack(); }
+  if (sheetOpen()) {
+    const prev = sheetStack.pop();
+    if (prev) { pendingOpener = {...prev, back:true}; prev.fn(...prev.args); }
+    else closeSheet();
+    return updateBack();
+  }
+  if (tabHist.length) { tab = tabHist.pop(); window.scrollTo(0,0); render(); }
+  updateBack();
+}
+const canBack = () => $("viewer").classList.contains("show") || sheetOpen() || tabHist.length>0;
+function updateBack(){
+  const on = canBack();
+  const tb = tg && tg.BackButton && tg.isVersionAtLeast && tg.isVersionAtLeast("6.1") ? tg.BackButton : null;
+  if (tb) { on ? tb.show() : tb.hide(); }
+  else $("backBtn").style.display = on ? "flex" : "none";
+}
+function goTab(t){ if (t===tab) return; tabHist.push(tab); if (tabHist.length>20) tabHist.shift(); tab=t; window.scrollTo(0,0); render(); updateBack(); }
 const field = (l,inner) => `<label>${l}</label>${inner}`;
 const numIn = (id,v) => `<input class="num" id="${id}" inputmode="numeric" placeholder="0" value="${v?fmt(v):""}">`;
 const dateIn = (id,v) => `<input id="${id}" type="date" value="${v||today()}">`;
@@ -1049,7 +1083,7 @@ document.addEventListener("click", e=>{
   }
   const el = e.target.closest("[data-act]"); if (!el) return;
   const a = el.dataset.act, id = +el.dataset.id;
-  if (a==="tab") { tab = el.dataset.t; window.scrollTo(0,0); render(); }
+  if (a==="tab") { if (el.closest("nav")) { tabHist = el.dataset.t==="home" ? [] : ["home"]; tab = el.dataset.t; window.scrollTo(0,0); render(); updateBack(); } else goTab(el.dataset.t); }
   else if (a==="mnav") { cur.setMonth(cur.getMonth() + +el.dataset.d); render(); }
   else if (a==="saleNew") saleSheet(null, el.dataset.sm);
   else if (a==="saleEdit") saleSheet(id);
@@ -1077,6 +1111,14 @@ $("sheetBg").addEventListener("click", e=>{
   if (e.target.id==="sheetBg") closeSheet();
 });
 $("viewer").addEventListener("click", ()=>$("viewer").classList.remove("show"));
+
+/* barcha oynalarni "orqaga" tarixiga ulash */
+const _wrap = (name, fn) => (...args) => { pendingOpener = {key: name+JSON.stringify(args), fn, args}; return fn(...args); };
+["saleSheet","expSheet","trSheet","startSheet","supNewSheet","supSheet","vendSheet","staffSheet","staffPaySheet","exSheet","attSheet","custSheet"]
+  .forEach(n => { window[n] = _wrap(n, window[n]); });
+if (tg && tg.BackButton) tg.BackButton.onClick(goBack);
+$("backBtn").addEventListener("click", goBack);
+$("viewer").addEventListener("click", updateBack);
 
 load();
 </script>

@@ -39,6 +39,11 @@ Invoice photos go to Supabase Storage, project `eormaktfhkaygogibtul`, public bu
 (insert-only policy for anon; 3 MB limit; jpeg/png/webp). Client compresses to ≤1600px JPEG before upload.
 The publishable key in `index.html` is public by design; never put a secret/service_role key in this repo.
 
+## Navigation
+Back button: Telegram `BackButton` (fallback `#backBtn` outside Telegram). Order: photo viewer → previous sheet
+(sheet functions are wrapped by `_wrap` to record a stack; reopening a sheet already in the stack truncates it) →
+close sheet → previous tab (any nav tab other than Asosiy goes back to Asosiy). New sheet functions must be added to the `_wrap` list.
+
 ## Working on it
 - Test in headless Chromium (Playwright) with `telegram.org` and `cdn.jsdelivr.net` routed to stubs;
   supabase.co is not reachable from the sandbox, so mock `window.supabase`.
