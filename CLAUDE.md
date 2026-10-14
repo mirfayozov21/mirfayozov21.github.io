@@ -17,9 +17,13 @@ Opened from the owner's Telegram bot via BotFather → Menu Button → that URL.
 - **Postavshik** — supplier deliveries (date, amount, credit days → due date, "N kun qoldi / o'tib ketdi"),
   partial payments, invoice photos; saved supplier list (`D.vendors`) to pick from.
 - **Klientlar** — customer debts (`type:"debt"`) and repayments (`type:"pay"`).
+- **Xodimlar** — staff (`D.staff`: salary, payDay, hasBonus, start time, since, active), monthly bonus (`D.bonus`),
+  salary/advance payments = expense ops `{cat:"Oylik", staffId, ptype:"avans"|"oylik", month:"YYYY-MM"}`
+  (month = whose salary it is; salary of month M is due on payDay of M+1), attendance `D.att` `{staffId, date, in, out}`
+  with monthly totals (days, hours, late arrivals vs `start`).
 
 ## Data
-One object `D = {ops, sups, cust, start, vendors}`:
+One object `D = {ops, sups, cust, start, vendors, staff, bonus, att}`:
 - `ops`: `{kind:"sale", date, smena?, naqd, humo, uzcard, karta, bank}`, `{kind:"exp", cat, acc, amount, vendor?}`, `{kind:"tr", acc, to, amount}`
 - `sups`: deliveries `{sup, amount, date, days, photos:[path], pays:[{amount, acc, date, op?}]}`.
   A pay with `op` belongs to an expense op (counted once, via the op, in `balances()`).

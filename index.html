@@ -58,7 +58,7 @@ h3{font-size:14px;color:var(--hint);font-weight:600;margin-bottom:8px;display:fl
 .filters button{border:none;background:var(--bg);color:var(--text);padding:8px 14px;border-radius:20px;font-size:14px}
 .filters button.on{background:var(--btn);color:var(--btnText)}
 nav{position:fixed;left:0;right:0;bottom:0;background:var(--bg);display:flex;border-top:1px solid var(--bg2);padding-bottom:env(safe-area-inset-bottom);z-index:5}
-nav button{flex:1;border:none;background:none;color:var(--hint);padding:8px 2px 9px;font-size:11px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:2px}
+nav button{flex:1;min-width:0;border:none;background:none;color:var(--hint);padding:8px 0 9px;font-size:10px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:2px}
 nav button span{font-size:20px}
 nav button.on{color:var(--btn)}
 .sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:flex-end;z-index:10}
@@ -80,6 +80,11 @@ input.num{font-weight:700;font-size:18px}
 .x{background:none;border:none;color:var(--red);font-size:18px;padding:0 4px}
 .box{background:var(--bg2);border-radius:12px;padding:10px 12px;margin-top:8px}
 .box .line{border-bottom-color:var(--bg)}
+.att{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--bg2)}
+.att:last-child{border-bottom:none}
+.att .mid small{white-space:normal}
+.att .tbtn{border:none;border-radius:10px;padding:9px 12px;font-size:14px;font-weight:600;background:var(--btn);color:var(--btnText);white-space:nowrap}
+.att .tbtn.out{background:var(--bg2);color:var(--text)}
 .vchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .vchips button{border:none;background:var(--bg2);color:var(--text);padding:8px 12px;border-radius:20px;font-size:14px}
 .vchips button.on{background:var(--btn);color:var(--btnText)}
@@ -107,6 +112,7 @@ label.photoBtn{display:block;text-align:center;padding:12px;border-radius:10px;b
   <button data-act="tab" data-t="exp"><span>💸</span>Rasxod</button>
   <button data-act="tab" data-t="sup"><span>🚚</span>Postavshik</button>
   <button data-act="tab" data-t="cust"><span>👥</span>Klientlar</button>
+  <button data-act="tab" data-t="staff"><span>👔</span>Xodimlar</button>
 </nav>
 
 <div class="sheet-bg" id="sheetBg"><div class="sheet" id="sheet"></div></div>
@@ -132,7 +138,7 @@ const BUCKET = "nakladnoy";
 let SB = null;
 try { SB = window.supabase.createClient(SB_URL, SB_KEY, {auth:{persistSession:false}}); } catch(e){}
 
-let D = { ops:[], sups:[], cust:[], start:{}, vendors:[] };
+let D = { ops:[], sups:[], cust:[], start:{}, vendors:[], staff:[], att:[], bonus:[] };
 let tab = "home", cur = new Date(), supFilter = "open", F = {};
 cur.setDate(1);
 
@@ -216,7 +222,17 @@ const csGet = keys => new Promise(r => CS.getItems(keys,(e,v)=>r(e?{}:v||{})));
 const csSet = (k,v) => new Promise(r => CS.setItem(k,v,()=>r()));
 const csDel = keys => new Promise(r => keys.length ? CS.removeItems(keys,()=>r()) : r());
 function normalize(d){
-  const r = { ops:d.ops||[], sups:d.sups||[], cust:d.cust||[], start:d.start||{}, vendors:d.vendors||[] };
+  const r = { ops:d.ops||[], sups:d.sups||[], cust:d.cust||[], start:d.start||{}, vendors:d.vendors||[],
+              staff:d.staff||[], att:d.att||[], bonus:d.bonus||[], staffInit:!!d.staffInit };
+  if (!r.staffInit) {
+    const m = "2026-10";
+    r.staff = [
+      {id:uid(), name:"Dilrabo",  salary:3000000, payDay:5,  hasBonus:true,  start:"", phone:"", since:m, active:true},
+      {id:uid(), name:"Hayotxon", salary:2500000, payDay:5,  hasBonus:true,  start:"", phone:"", since:m, active:true},
+      {id:uid(), name:"Mirjalol", salary:3000000, payDay:15, hasBonus:false, start:"", phone:"", since:m, active:true},
+      {id:uid(), name:"Faridun",  salary:3000000, payDay:15, hasBonus:false, start:"", phone:"", since:m, active:true}];
+    r.staffInit = true;
+  }
   r.sups.slice().sort((a,b)=>a.date.localeCompare(b.date)).forEach(x=>ensureVendor(x.sup, x.days, r));
   return r;
 }
@@ -243,6 +259,47 @@ function vendorPay(vendor, amount, acc, date, note, targetId){
   const op = {id:uid(), kind:"exp", cat:SUPCAT, vendor, amount, acc, date, note:note||""};
   D.ops.push(op); applyPay(op, targetId); return op;
 }
+/* ---------- Xodimlar ---------- */
+const STAFFCAT = "Oylik";
+const MONTHS_GEN = ["yanvar","fevral","mart","aprel","may","iyun","iyul","avgust","sentabr","oktabr","noyabr","dekabr"];
+const mLabel = m => `${MONTHS[+m.slice(5,7)-1]} ${m.slice(0,4)}`;
+const nextMonth = m => { const d=new Date(+m.slice(0,4), +m.slice(5,7), 1); return monthKey(d); };
+const prevMonth = m => { const d=new Date(+m.slice(0,4), +m.slice(5,7)-2, 1); return monthKey(d); };
+const getBonus = (sid,m) => (D.bonus.find(b=>b.staffId===sid&&b.month===m)||{}).amount||0;
+function setBonus(sid,m,a){ const b=D.bonus.find(x=>x.staffId===sid&&x.month===m); if(b) b.amount=a; else D.bonus.push({staffId:sid, month:m, amount:a}); }
+const staffPays = (sid,m) => D.ops.filter(o=>o.kind==="exp"&&o.staffId===sid&&(!m||o.month===m));
+function salaryInfo(st, m){
+  const due = nextMonth(m)+"-"+String(st.payDay).padStart(2,"0");
+  const total = st.salary + (st.hasBonus ? getBonus(st.id,m) : 0);
+  const paid = sum(staffPays(st.id,m), o=>o.amount);
+  const rem = total - paid, left = dnum(due) - dnum(today());
+  return {due, total, paid, rem, left, bonus:getBonus(st.id,m)};
+}
+function salaryBadge(i, m){
+  if (i.rem<=0) return `<span class="bdg ok">To'langan</span>`;
+  if (m >= monthKey(new Date())) return `<span class="bdg">${+i.due.slice(8)}-${MONTHS_GEN[+i.due.slice(5,7)-1]}gacha</span>`;
+  if (i.left<0) return `<span class="bdg bad">${-i.left} kun o'tib ketdi</span>`;
+  if (i.left<=3) return `<span class="bdg warn">${i.left===0?"Bugun berish kerak":i.left+" kun qoldi"}</span>`;
+  return `<span class="bdg">${+i.due.slice(8)}-${MONTHS_GEN[+i.due.slice(5,7)-1]}gacha</span>`;
+}
+/* oylik muddati yaqin yoki o'tgan (o'tgan oylar bo'yicha) */
+function salaryWarnings(){
+  const res = [], cm = monthKey(new Date());
+  D.staff.filter(st=>st.active!==false).forEach(st=>{
+    for (let m=st.since||cm; m<cm; m=nextMonth(m)) { const i=salaryInfo(st,m); if (i.rem>0 && i.left<=3) res.push({st,m,i}); }
+  });
+  return res.sort((a,b)=>a.i.left-b.i.left);
+}
+const hm = t => t ? (+t.slice(0,2))*60 + (+t.slice(3,5)) : null;
+const nowTime = () => { const d=new Date(); return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); };
+const fmtH = mins => `${Math.floor(mins/60)} soat${mins%60?` ${mins%60} daq`:""}`;
+function attStats(st, m){
+  const xs = D.att.filter(a=>a.staffId===st.id && a.date.startsWith(m));
+  let mins=0, late=0;
+  xs.forEach(a=>{ if (a.in && a.out) { let d=hm(a.out)-hm(a.in); if (d<0) d+=1440; mins+=d; } if (st.start && a.in && hm(a.in)>hm(st.start)) late++; });
+  return {days:xs.length, mins, late, list:xs.sort((a,b)=>a.date.localeCompare(b.date))};
+}
+
 function vendorStats(){
   const m = {};
   D.vendors.forEach(v=>m[vkey(v.name)]={v, last:"", debt:0, late:0, cnt:0});
@@ -251,7 +308,7 @@ function vendorStats(){
 }
 
 async function load(){
-  try { const s=localStorage.getItem(LS); if(s) D=normalize(JSON.parse(s)); } catch(e){}
+  try { const s=localStorage.getItem(LS); D = normalize(s ? JSON.parse(s) : {}); } catch(e){ D = normalize({}); }
   render();
   if (!CS) return;
   try {
@@ -284,7 +341,7 @@ function save(){
 /* ================= Sahifalar ================= */
 function render(){
   document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on", b.dataset.t===tab));
-  $("page").innerHTML = ({home:pHome, sale:pSale, exp:pExp, sup:pSup, cust:pCust})[tab]();
+  $("page").innerHTML = ({home:pHome, sale:pSale, exp:pExp, sup:pSup, cust:pCust, staff:pStaff})[tab]();
 }
 const monthBar = () => `<div class="month"><button data-act="mnav" data-d="-1">‹</button><span>${MONTHS[cur.getMonth()]} ${cur.getFullYear()}</span><button data-act="mnav" data-d="1">›</button></div>`;
 
@@ -300,6 +357,7 @@ function pHome(){
   const open = D.sups.map(s=>({s,i:supInfo(s)})).filter(x=>x.i.rem>0);
   const warn = open.filter(x=>x.i.left<=3).sort((a,c)=>a.i.left-c.i.left);
   const custDebt = sum(custList(), c=>Math.max(0,c.bal));
+  const sw = salaryWarnings();
 
   return `
   <div class="card">
@@ -308,6 +366,12 @@ function pHome(){
     <div class="grid">${ACCS.map(k=>`<div class="mini"><small>${ACC[k]}</small><b>${fmt(day[k])}</b></div>`).join("")}</div>
     <div class="row2" style="margin-top:8px">${[1,2].map(n=>{ const xs=ts.filter(o=>+o.smena===n); return `<div class="mini" style="flex:1" data-act="${xs.length?"saleEdit":"saleNew"}" data-id="${xs.length?xs[0].id:""}" data-sm="${n}"><small>${SMENA[n]}</small><b class="${xs.length?"green":""}">${xs.length?fmt(sum(xs,saleTotal)):"Yopilmagan"}</b></div>`; }).join("")}</div>
   </div>
+
+  ${sw.length ? `<div class="card"><h3>⚠️ Xodimlar oyligi</h3>${sw.map(x=>`
+    <div class="item" data-act="staffOpen" data-id="${x.st.id}" data-m="${x.m}">
+      <div class="mid"><div>${esc(x.st.name)}</div><small>${mLabel(x.m)} oyligi</small>${salaryBadge(x.i,x.m)}</div>
+      <div class="amt red">${fmt(x.i.rem)}</div>
+    </div>`).join("")}</div>` : ""}
 
   ${warn.length ? `<div class="card"><h3>⚠️ Postavshiklarga to'lov muddati</h3>${warn.map(x=>`
     <div class="item" data-act="supOpen" data-id="${x.s.id}">
@@ -381,9 +445,9 @@ function pExp(){
   </div>
   <div class="card">
     ${list.length ? list.map(o=> o.kind==="exp" ? `
-      <div class="item" data-act="expEdit" data-id="${o.id}">
-        <div class="ico">${o.cat===SUPCAT?"🚚":"💸"}</div>
-        <div class="mid"><div>${o.cat===SUPCAT?"Postavshikka: "+esc(o.vendor):esc(o.cat)}</div><small>${fd(o.date)} · ${ACC[o.acc]}${o.note?" · "+esc(o.note):""}</small></div>
+      <div class="item" data-act="${o.staffId?"staffPayEdit":"expEdit"}" data-id="${o.id}">
+        <div class="ico">${o.cat===SUPCAT?"🚚":o.staffId?"👔":"💸"}</div>
+        <div class="mid"><div>${o.cat===SUPCAT?"Postavshikka: "+esc(o.vendor):o.staffId?`${o.ptype==="avans"?"Avans":"Oylik"}: ${esc((D.staff.find(x=>x.id===o.staffId)||{}).name||"xodim")} (${mLabel(o.month)})`:esc(o.cat)}</div><small>${fd(o.date)} · ${ACC[o.acc]}${o.note?" · "+esc(o.note):""}</small></div>
         <div class="amt red">−${fmt(o.amount)}</div>
       </div>` : `
       <div class="item" data-act="trEdit" data-id="${o.id}">
@@ -433,6 +497,42 @@ function pSup(){
         <div class="amt">${fmt(x.s.amount)}${x.i.rem>0&&x.i.paid>0?`<small>qoldi ${fmt(x.i.rem)}</small>`:""}</div>
       </div>`).join("") : `<div class="empty">${supFilter==="open"?"To'lanmagan yuk yo'q 👍":"Hali yuk kiritilmagan"}</div>`}
   </div>`}`;
+}
+
+function pStaff(){
+  const m = monthKey(cur), t = today(), act = D.staff.filter(st=>st.active!==false);
+  const isCur = m===monthKey(new Date());
+  return `${monthBar()}
+  <div class="card">
+    <h3><span>Bugungi davomat · ${fd(t)}</span></h3>
+    ${act.length ? act.map(st=>{
+      const a = D.att.find(x=>x.staffId===st.id && x.date===t);
+      const btn = !a ? `<button class="tbtn" data-act="attIn" data-id="${st.id}">Keldi</button>`
+        : !a.out ? `<button class="tbtn out" data-act="attOut" data-id="${st.id}">Ketdi</button>` : "";
+      const late = a && st.start && hm(a.in)>hm(st.start);
+      return `<div class="att">
+        <div class="mid" data-act="attEdit" data-id="${st.id}" data-d="${t}"><div>${esc(st.name)}</div>
+          <small>${a ? `Keldi ${a.in}${late?` <span class="red">(kechikdi)</span>`:""}${a.out?` · Ketdi ${a.out}`:""}` : "Hali kelmadi"}</small></div>
+        ${btn}</div>`; }).join("") : `<div class="empty">Xodim yo'q</div>`}
+  </div>
+
+  <div class="card">
+    <h3><span>${MONTHS[cur.getMonth()]} oyligi</span><span>${fmt(sum(act,st=>salaryInfo(st,m).rem))}</span></h3>
+    ${act.map(st=>{ const i=salaryInfo(st,m); return `
+      <div class="item" data-act="staffOpen" data-id="${st.id}" data-m="${m}">
+        <div class="ico">👔</div>
+        <div class="mid"><div>${esc(st.name)}</div>
+          <small>Oylik ${fmt(st.salary)}${st.hasBonus?` + bonus ${fmt(i.bonus)}`:""} · berildi ${fmt(i.paid)}</small>${salaryBadge(i,m)}</div>
+        <div class="amt ${i.rem>0?"red":"green"}">${i.rem>0?fmt(i.rem):i.rem<0?"+"+fmt(-i.rem):"0"}<small>qoldi</small></div>
+      </div>`; }).join("")}
+  </div>
+
+  <div class="card">
+    <h3><span>Davomat · ${MONTHS[cur.getMonth()]}${isCur?" (hozirgacha)":""}</span></h3>
+    ${act.map(st=>{ const a=attStats(st,m); return `<div class="line" data-act="staffOpen" data-id="${st.id}" data-m="${m}">
+      <span>${esc(st.name)}</span><span style="text-align:right"><b>${a.days} kun</b> · ${fmtH(a.mins)}${st.start?` · <span class="${a.late?"red":""}">${a.late} marta kech</span>`:""}</span></div>`; }).join("")}
+  </div>
+  <button class="addbtn ghost" style="background:var(--bg)" data-act="staffNew">+ Xodim qo'shish</button>`;
 }
 
 function pCust(){
@@ -749,6 +849,107 @@ function vendSheet(id){
   }, v && (()=>{ D.vendors = D.vendors.filter(x=>x!==v); }));
 }
 
+/* --- Xodim --- */
+function staffSheet(id, m){
+  const st = id ? D.staff.find(x=>x.id===id) : null;
+  m = m || monthKey(cur);
+  let body = "";
+  if (st) {
+    const i = salaryInfo(st, m), pays = staffPays(st.id, m).sort((a,b)=>a.date.localeCompare(b.date)), a = attStats(st, m);
+    body = `${st.phone?`<a class="callbtn" href="tel:${esc(st.phone.replace(/[^+\d]/g,""))}">📞 ${esc(st.phone)}</a>`:""}
+    <h4>${mLabel(m)} oyligi ${salaryBadge(i,m)}</h4>
+    <div class="box">
+      <div class="line"><span>Oylik</span><b>${fmt(st.salary)}</b></div>
+      ${st.hasBonus?`<div class="line"><span>Bonus</span><span><input class="num" id="bonusIn" inputmode="numeric" value="${i.bonus?fmt(i.bonus):""}" placeholder="0" style="width:130px;padding:6px 10px;font-size:15px;text-align:right"></span></div>`:""}
+      <div class="line"><span>Jami hisoblangan</span><b>${fmt(i.total)}</b></div>
+      <div class="line"><span>Berildi (avans + oylik)</span><b class="green">${fmt(i.paid)}</b></div>
+      <div class="line"><span>${i.rem>=0?"Berilishi kerak":"Ortiqcha berilgan"}</span><b class="${i.rem>0?"red":""}">${fmt(Math.abs(i.rem))}</b></div>
+      <div class="line"><span>Berish muddati</span><b>${fd(i.due)}</b></div>
+    </div>
+    ${pays.length?`<h4>Berilgan pullar</h4><div class="box">${pays.map(o=>`<div class="line" data-act="staffPayEdit" data-id="${o.id}"><span>${fd(o.date)} · ${o.ptype==="avans"?"Avans":"Oylik"} · ${ACC[o.acc].split(" ").slice(1).join(" ")}</span><b>${fmt(o.amount)}</b></div>`).join("")}</div>`:""}
+    <div class="actions"><button class="save" id="giveBtn">💵 Pul berish (avans / oylik)</button></div>
+    <h4>Davomat · ${mLabel(m)}</h4>
+    <div class="box">
+      <div class="line"><span>Ishga kelgan kunlar</span><b>${a.days} kun</b></div>
+      <div class="line"><span>Jami ishlagan</span><b>${fmtH(a.mins)}</b></div>
+      ${st.start?`<div class="line"><span>Kechikishlar (${st.start} dan keyin)</span><b class="${a.late?"red":""}">${a.late} marta</b></div>`:""}
+      ${a.list.map(x=>`<div class="line" data-act="attEdit" data-id="${st.id}" data-d="${x.date}"><span>${fd(x.date)}</span><span>${x.in||"—"} → ${x.out||"—"}${st.start&&x.in&&hm(x.in)>hm(st.start)?' <span class="red">kech</span>':""}</span></div>`).join("")}
+    </div>
+    <div class="actions"><button class="cancel" id="attAddBtn">+ Kunni qo'lda kiritish</button></div>
+    <h4>Xodim ma'lumotlari</h4>`;
+  }
+  openSheet(`<h2>${st?esc(st.name):"Yangi xodim"}</h2>${body}
+    ${field("Ismi", textIn("sName", st?st.name:"", "ism"))}
+    ${field("Oylik (so'm)", numIn("sSalary", st&&st.salary))}
+    ${field("Oylik har oyning nechanchi sanasigacha beriladi", `<input id="sDay" inputmode="numeric" value="${st?st.payDay:5}">`)}
+    ${field("Bonus oladimi", chips("hasBonus", [["1","Ha"],["0","Yo'q"]], st&&st.hasBonus?"1":"0"))}
+    ${field("Ishga kelish vaqti (kechikishni hisoblash uchun, ixtiyoriy)", `<input id="sStart" type="time" value="${st?st.start:""}">`)}
+    ${field("Telefon", `<input id="sPhone" type="tel" value="${esc(st?st.phone:"")}" placeholder="+998 ..">`)}
+    ${actions(!!st)}`);
+  if (st) {
+    if ($("bonusIn")) $("bonusIn").addEventListener("change", ()=>{ setBonus(st.id, m, num("bonusIn")); save(); render(); staffSheet(st.id, m); });
+    $("giveBtn").onclick = ()=>staffPaySheet(st.id, null, m);
+    $("attAddBtn").onclick = ()=>attSheet(st.id, today());
+  }
+  bind(()=>{
+    const name = $("sName").value.trim(); if (!name) return bad("sName");
+    const r = {name, salary:num("sSalary"), payDay:Math.min(31,Math.max(1,num("sDay")||5)), hasBonus:F.hasBonus==="1", start:$("sStart").value, phone:$("sPhone").value.trim()};
+    if (st) { Object.assign(st, r); if (st.hasBonus && $("bonusIn")) setBonus(st.id, m, num("bonusIn")); }
+    else D.staff.push({id:uid(), since:monthKey(new Date()), active:true, ...r});
+    done();
+  }, st && (()=>{ if (staffPays(st.id).length || D.att.some(a=>a.staffId===st.id)) st.active=false; else D.staff=D.staff.filter(x=>x!==st); }));
+}
+
+function staffPaySheet(sid, opId, m){
+  const o = opId ? D.ops.find(x=>x.id===opId) : null;
+  const st = D.staff.find(x=>x.id===(o?o.staffId:sid)); if (!st) return;
+  const cm = monthKey(new Date());
+  const defType = o ? o.ptype : (m && m<cm ? "oylik" : "avans");
+  const defMonth = o ? o.month : (m || cm);
+  openSheet(`<h2>${esc(st.name)} — ${o?"to'lovni tahrirlash":"pul berish"}</h2>
+    ${field("Turi", chips("ptype", [["avans","Avans (oldindan)"],["oylik","Oylik"]], defType))}
+    ${field("Qaysi oy oyligidan", `<input id="pMonth" type="month" value="${defMonth}">`)}
+    <div class="lbl" id="pInfo" style="margin-top:6px"></div>
+    ${field("Summa", numIn("pAmt", o&&o.amount))}
+    ${field("Qayerdan berildi", accChips("acc", o?o.acc:"naqd"))}
+    ${field("Berilgan sana", dateIn("pDate", o&&o.date))}
+    ${field("Izoh", textIn("pNote", o?o.note:"", "ixtiyoriy"))}
+    ${actions(!!o)}`);
+  const info = () => {
+    const mm = $("pMonth").value || defMonth, i = salaryInfo(st, mm);
+    const rem = i.rem + (o && o.month===mm ? o.amount : 0);
+    $("pInfo").textContent = `${mLabel(mm)}: hisoblangan ${fmt(i.total)}, berilishi kerak ${fmt(Math.max(0,rem))} so'm`;
+    return rem;
+  };
+  $("pMonth").addEventListener("change", info);
+  const r0 = info(); if (!o && defType==="oylik" && r0>0) $("pAmt").value = fmt(r0);
+  F.onChip = (n,v)=>{ if (n==="ptype" && v==="oylik" && !num("pAmt")) { const r=info(); if (r>0) $("pAmt").value=fmt(r); } };
+  bind(()=>{
+    const amount = num("pAmt"); if (!amount) return bad("pAmt");
+    const month = $("pMonth").value || defMonth;
+    const r = {kind:"exp", cat:STAFFCAT, staffId:st.id, ptype:F.ptype, month, amount, acc:F.acc, date:$("pDate").value||today(), note:$("pNote").value.trim()};
+    if (o) Object.assign(o, r); else D.ops.push({id:uid(), ...r});
+    done(true); staffSheet(st.id, month);
+  }, o && (()=>{ D.ops = D.ops.filter(x=>x!==o); }));
+}
+
+function attSheet(sid, date){
+  const st = D.staff.find(x=>x.id===sid); if (!st) return;
+  const a = D.att.find(x=>x.staffId===sid && x.date===date);
+  openSheet(`<h2>${esc(st.name)} — davomat</h2>
+    ${field("Sana", dateIn("aDate", date))}
+    ${field("Keldi", `<input id="aIn" type="time" value="${a?a.in||"":""}">`)}
+    ${field("Ketdi", `<input id="aOut" type="time" value="${a?a.out||"":""}">`)}
+    ${actions(!!a)}`);
+  bind(()=>{
+    const d = $("aDate").value||date, tin = $("aIn").value, tout = $("aOut").value;
+    if (!tin) return bad("aIn");
+    D.att = D.att.filter(x=>!(x.staffId===sid && (x===a || x.date===d)));
+    D.att.push({id:uid(), staffId:sid, date:d, in:tin, out:tout||""});
+    done();
+  }, a && (()=>{ D.att = D.att.filter(x=>x!==a); }));
+}
+
 /* --- Klient --- */
 function custSheet(name){
   const hist = name ? D.cust.filter(c=>c.name===name).sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id) : [];
@@ -811,6 +1012,12 @@ document.addEventListener("click", e=>{
   else if (a==="vendNew") vendSheet();
   else if (a==="vendOpen") vendSheet(id);
   else if (a==="custNew") custSheet();
+  else if (a==="staffNew") staffSheet();
+  else if (a==="staffOpen") staffSheet(id, el.dataset.m);
+  else if (a==="staffPayEdit") staffPaySheet(null, id);
+  else if (a==="attEdit") attSheet(id, el.dataset.d);
+  else if (a==="attIn") { D.att.push({id:uid(), staffId:id, date:today(), in:nowTime(), out:""}); haptic("success"); save(); render(); }
+  else if (a==="attOut") { const x=D.att.find(r=>r.staffId===id&&r.date===today()); if (x) { x.out=nowTime(); haptic("success"); save(); render(); } }
   else if (a==="custOpen") custSheet(decodeURIComponent(el.dataset.n));
 });
 $("sheetBg").addEventListener("click", e=>{
