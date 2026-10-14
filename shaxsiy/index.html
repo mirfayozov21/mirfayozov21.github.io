@@ -276,19 +276,23 @@ function seedTbc(){
   D.seeds.push(TBC_SEED);
   return true;
 }
-/* Bir martalik: Xalq banki mikrokrediti. Oktabr 2026 – aprel 2027 to'lovlari bank jadvalidan (aniq);
-   asosiy/foiz bo'linishi va oxirgi qatordagi qolgan asosiy qarz (bank qoldig'i 8 688 030,84 dan) — taxminiy. */
-const XALQ_SEED = "xalq-bank-2026";
-const XALQ = `2026-10-24|604100|127005,2026-11-24|604100|123718,2026-12-24|604100|115170,2027-01-24|604100|100704,2027-02-24|604100|93142,2027-03-24|604100|80978,2027-04-24|604100|78666,2027-04-24|4459330.84|0`;
-function seedXalq(){
-  if (D.seeds.includes(XALQ_SEED)) return false;
+/* Bir martalik: Xalq banki mikrokrediti. Oktabr 2026 – aprel 2027 to'lovlari bank jadvalidan;
+   jami qolgan qarz bank ko'rsatgan qoldiqqa (8 688 030,84) teng bo'lishi uchun farq oxirgi qatorga qo'yilgan. */
+const XALQ_SEED = "xalq-bank-2026", XALQ_FIX = "xalq-bank-2026-v2";
+const XALQ = `2026-10-24|731105|0,2026-11-24|727818|0,2026-12-24|719270|0,2027-01-24|704804|0,2027-02-24|697242|0,2027-03-24|685078|0,2027-04-24|682766|0,2027-04-24|3739947.84|0`;
+function xalqData(){
   const sched = XALQ.split(",").map(x=>{ const [date,p,i]=x.split("|"); return {date, prin:+p, int:+i}; });
-  const total = r2(sum(sched,s=>s.prin+s.int));
-  D.loans.push({id:uid(), name:"Xalq banki mikrokrediti", cur:"UZS", total, monthly:0, day:24, start:"2026-10-15", sched,
+  return {name:"Xalq banki mikrokrediti", cur:"UZS", total:r2(sum(sched,s=>s.prin+s.int)), monthly:0, day:24, start:"2026-10-15", sched, noSplit:true,
     info:[["Shartnoma summasi","20 000 000 so'm"],["Foiz","18% (yillik)"],["Qarz qoldig'i (15.10.2026)","8 688 030,84 so'm"],["Tugash sanasi","24.04.2027"],["Shartnoma","№ 5248311"],
-      ["Diqqat","Bankda 19 kun kechikish bor"],["Izoh","Oxirgi qatordagi 4 459 331 so'm — jadvalda ko'rinmagan qolgan asosiy qarz (taxminiy)"]],
-    pays:[]});
-  D.seeds.push(XALQ_SEED);
+      ["Diqqat","Bankda 19 kun kechikish bor"],["Izoh","Oxirgi qator — jadvalda ko'rinmagan qolgan qarz"]]};
+}
+function seedXalq(){
+  if (D.seeds.includes(XALQ_FIX)) return false;
+  const old = D.seeds.includes(XALQ_SEED) ? D.loans.find(l=>l.name==="Xalq banki mikrokrediti" && l.sched) : null;
+  if (old) Object.assign(old, xalqData());                 // avvalgi versiyani tuzatish (to'lovlar saqlanadi)
+  else if (!D.seeds.includes(XALQ_SEED)) D.loans.push({id:uid(), ...xalqData(), pays:[]});
+  if (!D.seeds.includes(XALQ_SEED)) D.seeds.push(XALQ_SEED);
+  D.seeds.push(XALQ_FIX);
   return true;
 }
 function seedLoans(){
@@ -704,7 +708,7 @@ function loanSheet(id){
         ${i.rem>0&&!i.simple?`<div class="line"><span>Keyingi to'lov</span><b>${fd(i.due)}${l.sched?` · ${money(i.nextAmt,l.cur)}`:""}</b></div><div class="line"><span>Qolgan oylar</span><b>${l.sched?"":"~"}${i.monthsLeft} oy</b></div>`:""}
         ${l.info?l.info.map(([k,v])=>`<div class="line"><span style="flex-shrink:0">${esc(k)}</span><b style="white-space:normal;text-align:right">${esc(v)}</b></div>`).join(""):""}
       </div>
-      ${l.sched?`<h4>To'lov grafigi</h4><div class="box">${i.rows.map(r=>`<div class="line"><span>${r.n}. ${fd(r.date)}<br><small class="lbl">${r.prin?`asosiy ${fmt(r.prin)} · `:""}foiz ${fmt(r.int)}</small></span><span style="text-align:right"><b class="${r.done?"green":""}">${money(r.amt,l.cur)}</b><br>${r.done?`<span class="bdg ok">To'langan</span>`:r.got>0?`<span class="bdg warn">${money(r.left,l.cur)} qoldi</span>`:dueBadge(r.left, dnum(r.date)-dnum(today()))}</span></div>`).join("")}</div>`:""}
+      ${l.sched?`<h4>To'lov grafigi</h4><div class="box">${i.rows.map(r=>`<div class="line"><span>${r.n}. ${fd(r.date)}<br>${l.noSplit?"":`<small class="lbl">${r.prin?`asosiy ${fmt(r.prin)} · `:""}foiz ${fmt(r.int)}</small>`}</span><span style="text-align:right"><b class="${r.done?"green":""}">${money(r.amt,l.cur)}</b><br>${r.done?`<span class="bdg ok">To'langan</span>`:r.got>0?`<span class="bdg warn">${money(r.left,l.cur)} qoldi</span>`:dueBadge(r.left, dnum(r.date)-dnum(today()))}</span></div>`).join("")}</div>`:""}
       ${l.pays.length?`<h4>To'lovlar</h4><div class="box">${l.pays.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(p=>`<div class="line"><span>${fd(p.date)} · ${p.pre?"oldin to'langan":esc(accName(p.acc))}</span><span><b>${money(p.amount,l.cur)}</b><button class="x" data-pdel="${p.id}">×</button></span></div>`).join("")}</div>`:""}
       ${i.rem>0?`<h4>To'lov qilish</h4>
         ${numIn("pAmt", l.sched||i.simple ? i.nextAmt : Math.min(l.monthly, i.rem))}
