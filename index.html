@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Do'kon hisobi</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{
+  --bg:var(--tg-theme-bg-color,#ffffff);
+  --bg2:var(--tg-theme-secondary-bg-color,#f2f3f5);
+  --text:var(--tg-theme-text-color,#111);
+  --hint:var(--tg-theme-hint-color,#8a8f98);
+  --btn:var(--tg-theme-button-color,#2a8bf2);
+  --btnText:var(--tg-theme-button-text-color,#fff);
+  --green:#1fa463; --red:#e5484d; --orange:#e08a00;
+}
+*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,system-ui,"Segoe UI",Roboto,sans-serif}
+body{background:var(--bg2);color:var(--text);padding:12px 12px calc(84px + env(safe-area-inset-bottom));-webkit-tap-highlight-color:transparent}
+.card{background:var(--bg);border-radius:14px;padding:14px;margin-bottom:12px}
+.lbl{color:var(--hint);font-size:13px}
+.big{font-size:28px;font-weight:700;margin:2px 0 10px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.mini{background:var(--bg2);border-radius:10px;padding:9px 10px;min-width:0}
+.mini small{color:var(--hint);font-size:12px;display:block}
+.mini b{display:block;font-size:15px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.green{color:var(--green)}.red{color:var(--red)}.orange{color:var(--orange)}
+h3{font-size:14px;color:var(--hint);font-weight:600;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+.line{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--bg2);font-size:15px;gap:8px}
+.line:last-child{border-bottom:none}
+.line b{white-space:nowrap}
+.month{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.month button{background:var(--bg);border:none;color:var(--text);width:40px;height:36px;border-radius:10px;font-size:18px}
+.month span{font-weight:600}
+.addbtn{width:100%;background:var(--btn);color:var(--btnText);border:none;border-radius:12px;padding:13px;font-size:15px;font-weight:600;margin-bottom:12px}
+.row2{display:flex;gap:8px}
+.row2 .addbtn{flex:1}
+.ghost{background:var(--bg);color:var(--btn)}
+.item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--bg2)}
+.item:last-child{border-bottom:none}
+.ico{width:38px;height:38px;border-radius:50%;background:var(--bg2);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.mid{flex:1;min-width:0}
+.mid div{font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mid small{color:var(--hint);font-size:12px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.amt{font-weight:700;font-size:15px;white-space:nowrap;text-align:right}
+.amt small{display:block;font-weight:500;font-size:12px;color:var(--hint)}
+.bdg{display:inline-block;font-size:12px;font-weight:600;padding:3px 8px;border-radius:10px;background:var(--bg2);color:var(--hint);margin-top:3px}
+.bdg.bad{background:rgba(229,72,77,.14);color:var(--red)}
+.bdg.warn{background:rgba(224,138,0,.15);color:var(--orange)}
+.bdg.ok{background:rgba(31,164,99,.14);color:var(--green)}
+.empty{text-align:center;color:var(--hint);padding:20px 0;font-size:14px}
+.bar{margin-bottom:10px}
+.bar .top{display:flex;justify-content:space-between;font-size:14px;margin-bottom:4px}
+.track{height:8px;background:var(--bg2);border-radius:4px;overflow:hidden}
+.fill{height:100%;border-radius:4px;background:var(--red)}
+.filters{display:flex;gap:6px;margin-bottom:12px}
+.filters button{border:none;background:var(--bg);color:var(--text);padding:8px 14px;border-radius:20px;font-size:14px}
+.filters button.on{background:var(--btn);color:var(--btnText)}
+nav{position:fixed;left:0;right:0;bottom:0;background:var(--bg);display:flex;border-top:1px solid var(--bg2);padding-bottom:env(safe-area-inset-bottom);z-index:5}
+nav button{flex:1;border:none;background:none;color:var(--hint);padding:8px 2px 9px;font-size:11px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:2px}
+nav button span{font-size:20px}
+nav button.on{color:var(--btn)}
+.sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:flex-end;z-index:10}
+.sheet-bg.show{display:flex}
+.sheet{background:var(--bg);width:100%;border-radius:18px 18px 0 0;padding:16px 16px calc(20px + env(safe-area-inset-bottom));max-height:92vh;overflow:auto}
+.sheet h2{font-size:18px;margin-bottom:6px}
+.sheet h4{font-size:14px;color:var(--hint);margin:16px 0 4px}
+label{display:block;font-size:13px;color:var(--hint);margin:10px 0 4px}
+input{width:100%;padding:12px;border-radius:10px;border:none;background:var(--bg2);color:var(--text);font-size:16px;outline:none;-webkit-appearance:none}
+input.num{font-weight:700;font-size:18px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips button{border:none;background:var(--bg2);color:var(--text);padding:8px 12px;border-radius:20px;font-size:14px}
+.chips button.on{background:var(--btn);color:var(--btnText)}
+.actions{display:flex;gap:8px;margin-top:16px}
+.actions button{flex:1;padding:14px;border-radius:12px;border:none;font-size:15px;font-weight:600}
+.save{background:var(--btn);color:var(--btnText)}
+.cancel{background:var(--bg2);color:var(--text)}
+.del{background:none;color:var(--red);border:none;width:100%;padding:12px;margin-top:6px;font-size:15px}
+.x{background:none;border:none;color:var(--red);font-size:18px;padding:0 4px}
+.box{background:var(--bg2);border-radius:12px;padding:10px 12px;margin-top:8px}
+.box .line{border-bottom-color:var(--bg)}
+</style>
+</head>
+<body>
+
+<div id="page"></div>
+
+<nav>
+  <button data-act="tab" data-t="home" class="on"><span>🏠</span>Asosiy</button>
+  <button data-act="tab" data-t="sale"><span>🛒</span>Savdo</button>
+  <button data-act="tab" data-t="exp"><span>💸</span>Rasxod</button>
+  <button data-act="tab" data-t="sup"><span>🚚</span>Postavshik</button>
+  <button data-act="tab" data-t="cust"><span>👥</span>Klientlar</button>
+</nav>
+
+<div class="sheet-bg" id="sheetBg"><div class="sheet" id="sheet"></div></div>
+
+<script>
+const tg = (window.Telegram && Telegram.WebApp) ? Telegram.WebApp : null;
+if (tg) { tg.ready(); tg.expand(); }
+
+/* ================= Sozlamalar ================= */
+const ACC = {naqd:"💵 Naqd", humo:"💳 Humo terminal", uzcard:"💳 Uzcard terminal", karta:"💳 Karta", bank:"🏦 Bank hisobi"};
+const ACCS = Object.keys(ACC);
+const EXP_CATS = ["Ijara","Oylik","Kommunal","Transport","Soliq","Xo'jalik","Ovqat","Boshqa"];
+const MONTHS = ["Yanvar","Fevral","Mart","Aprel","May","Iyun","Iyul","Avgust","Sentabr","Oktabr","Noyabr","Dekabr"];
+
+let D = { ops:[], sups:[], cust:[], start:{} };
+let tab = "home", cur = new Date(), supFilter = "open", F = {};
+cur.setDate(1);
+
+/* ================= Yordamchilar ================= */
+const $ = id => document.getElementById(id);
+const fmt = n => Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g," ");
+const sm = n => (n<0?"−":"")+fmt(Math.abs(n));
+const esc = s => String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const uid = () => Date.now()*100 + Math.floor(Math.random()*100);
+const today = () => { const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); };
+const dnum = s => Math.round(Date.UTC(+s.slice(0,4), +s.slice(5,7)-1, +s.slice(8,10))/864e5);
+const addDays = (s,n) => new Date(Date.UTC(+s.slice(0,4), +s.slice(5,7)-1, +s.slice(8,10)+n)).toISOString().slice(0,10);
+const fd = s => s ? `${+s.slice(8,10)} ${MONTHS[+s.slice(5,7)-1].slice(0,3).toLowerCase()} ${s.slice(0,4)}` : "";
+const monthKey = d => d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
+const num = id => +(($(id)?.value||"").replace(/\D/g,"")) || 0;
+const sum = (a,f) => a.reduce((s,x)=>s+f(x),0);
+const haptic = t => { try { tg && tg.HapticFeedback.notificationOccurred(t); } catch(e){} };
+const saleTotal = o => sum(ACCS, k=>o[k]||0);
+
+function balances(){
+  const b = {}; ACCS.forEach(k=>b[k]=D.start[k]||0);
+  D.ops.forEach(o=>{
+    if (o.kind==="sale") ACCS.forEach(k=>b[k]+=o[k]||0);
+    if (o.kind==="exp") b[o.acc]-=o.amount;
+    if (o.kind==="tr") { b[o.acc]-=o.amount; b[o.to]+=o.amount; }
+  });
+  D.sups.forEach(s=>s.pays.forEach(p=>b[p.acc]-=p.amount));
+  D.cust.forEach(c=>{ if (c.type==="pay") b[c.acc]+=c.amount; });
+  return b;
+}
+function supInfo(s){
+  const paid = sum(s.pays,p=>p.amount), rem = Math.max(0, s.amount-paid);
+  const due = addDays(s.date, s.days||0), left = dnum(due)-dnum(today());
+  return {paid, rem, due, left};
+}
+function badge(i){
+  if (i.rem<=0) return `<span class="bdg ok">To'langan</span>`;
+  if (i.left<0) return `<span class="bdg bad">${-i.left} kun o'tib ketdi</span>`;
+  if (i.left===0) return `<span class="bdg bad">Bugun muddat</span>`;
+  if (i.left<=3) return `<span class="bdg warn">${i.left} kun qoldi</span>`;
+  return `<span class="bdg">${i.left} kun qoldi</span>`;
+}
+function custList(){
+  const m = {};
+  D.cust.forEach(c=>{ const k=c.name; m[k]=m[k]||{name:k,bal:0,last:""}; m[k].bal += c.type==="debt"?c.amount:-c.amount; if(c.date>m[k].last) m[k].last=c.date; });
+  return Object.values(m).sort((a,b)=>b.bal-a.bal);
+}
+const names = arr => [...new Set(arr)].sort().map(n=>`<option value="${esc(n)}">`).join("");
+
+/* ================= Saqlash: Telegram bulut + telefon xotirasi ================= */
+const CS = tg && tg.CloudStorage && tg.isVersionAtLeast && tg.isVersionAtLeast("6.9") ? tg.CloudStorage : null;
+const CHUNK = 3800, LS = "dokon_v2";
+const csGet = keys => new Promise(r => CS.getItems(keys,(e,v)=>r(e?{}:v||{})));
+const csSet = (k,v) => new Promise(r => CS.setItem(k,v,()=>r()));
+const csDel = keys => new Promise(r => keys.length ? CS.removeItems(keys,()=>r()) : r());
+function normalize(d){ return { ops:d.ops||[], sups:d.sups||[], cust:d.cust||[], start:d.start||{} }; }
+
+async function load(){
+  try { const s=localStorage.getItem(LS); if(s) D=normalize(JSON.parse(s)); } catch(e){}
+  render();
+  if (!CS) return;
+  try {
+    const n = parseInt((await csGet(["dn"])).dn||"0");
+    if (!n) return;
+    const keys = Array.from({length:n},(_,i)=>"d"+i);
+    const parts = await csGet(keys);
+    D = normalize(JSON.parse(keys.map(k=>parts[k]||"").join("")));
+    try { localStorage.setItem(LS, JSON.stringify(D)); } catch(e){}
+    render();
+  } catch(e){}
+}
+let saving = Promise.resolve();
+function save(){
+  const s = JSON.stringify(D);
+  try { localStorage.setItem(LS, s); } catch(e){}
+  if (!CS) return;
+  saving = saving.then(async()=>{
+    try {
+      const old = parseInt((await csGet(["dn"])).dn||"0");
+      const chunks = s.match(new RegExp(".{1,"+CHUNK+"}","gs")) || [""];
+      for (let i=0;i<chunks.length;i++) await csSet("d"+i, chunks[i]);
+      await csSet("dn", String(chunks.length));
+      const extra=[]; for (let i=chunks.length;i<old;i++) extra.push("d"+i);
+      await csDel(extra);
+    } catch(e){}
+  });
+}
+
+/* ================= Sahifalar ================= */
+function render(){
+  document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on", b.dataset.t===tab));
+  $("page").innerHTML = ({home:pHome, sale:pSale, exp:pExp, sup:pSup, cust:pCust})[tab]();
+}
+const monthBar = () => `<div class="month"><button data-act="mnav" data-d="-1">‹</button><span>${MONTHS[cur.getMonth()]} ${cur.getFullYear()}</span><button data-act="mnav" data-d="1">›</button></div>`;
+
+function pHome(){
+  const t = today();
+  const ts = D.ops.filter(o=>o.kind==="sale" && o.date===t);
+  const day = {}; ACCS.forEach(k=>day[k]=sum(ts,o=>o[k]||0));
+  const b = balances();
+  const mk = monthKey(new Date());
+  const mSale = sum(D.ops.filter(o=>o.kind==="sale"&&o.date.startsWith(mk)), saleTotal);
+  const mExp = sum(D.ops.filter(o=>o.kind==="exp"&&o.date.startsWith(mk)), o=>o.amount);
+  const open = D.sups.map(s=>({s,i:supInfo(s)})).filter(x=>x.i.rem>0);
+  const warn = open.filter(x=>x.i.left<=3).sort((a,c)=>a.i.left-c.i.left);
+  const custDebt = sum(custList(), c=>Math.max(0,c.bal));
+
+  return `
+  <div class="card">
+    <div class="lbl">Bugungi savdo · ${fd(t)}</div>
+    <div class="big">${fmt(sum(ACCS,k=>day[k]))} so'm</div>
+    <div class="grid">${ACCS.map(k=>`<div class="mini"><small>${ACC[k]}</small><b>${fmt(day[k])}</b></div>`).join("")}</div>
+  </div>
+
+  ${warn.length ? `<div class="card"><h3>⚠️ Postavshiklarga to'lov muddati</h3>${warn.map(x=>`
+    <div class="item" data-act="supOpen" data-id="${x.s.id}">
+      <div class="mid"><div>${esc(x.s.sup)}</div><small>Muddat: ${fd(x.i.due)}</small>${badge(x.i)}</div>
+      <div class="amt red">${fmt(x.i.rem)}</div>
+    </div>`).join("")}</div>` : ""}
+
+  <div class="card">
+    <h3>Hisoblar qoldig'i</h3>
+    ${ACCS.map(k=>`<div class="line"><span>${ACC[k]}</span><b class="${b[k]<0?"red":""}">${sm(b[k])}</b></div>`).join("")}
+    <div class="line"><span><b>Jami</b></span><b>${sm(sum(ACCS,k=>b[k]))} so'm</b></div>
+    <div class="row2" style="margin-top:10px">
+      <button class="addbtn ghost" style="background:var(--bg2);margin:0" data-act="trNew">↔ O'tkazma</button>
+      <button class="addbtn ghost" style="background:var(--bg2);margin:0" data-act="startBal">Boshlang'ich qoldiq</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Qarzlar</h3>
+    <div class="line" data-act="tab" data-t="sup"><span>🚚 Postavshiklarga qarzimiz</span><b class="red">${fmt(sum(open,x=>x.i.rem))}</b></div>
+    <div class="line" data-act="tab" data-t="cust"><span>👥 Klientlar bizga qarz</span><b class="green">${fmt(custDebt)}</b></div>
+  </div>
+
+  <div class="card">
+    <h3>${MONTHS[new Date().getMonth()]} oyi</h3>
+    <div class="line"><span>Savdo</span><b class="green">${fmt(mSale)}</b></div>
+    <div class="line"><span>Rasxod</span><b class="red">${fmt(mExp)}</b></div>
+    <div class="line"><span>Farq</span><b>${sm(mSale-mExp)}</b></div>
+  </div>`;
+}
+
+function pSale(){
+  const mk = monthKey(cur);
+  const list = D.ops.filter(o=>o.kind==="sale"&&o.date.startsWith(mk)).sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id);
+  const tot = {}; ACCS.forEach(k=>tot[k]=sum(list,o=>o[k]||0));
+  return `${monthBar()}
+  <button class="addbtn" data-act="saleNew">+ Kunlik savdoni kiritish</button>
+  <div class="card">
+    <div class="lbl">Oy bo'yicha savdo</div>
+    <div class="big">${fmt(sum(ACCS,k=>tot[k]))} so'm</div>
+    <div class="grid">${ACCS.map(k=>`<div class="mini"><small>${ACC[k]}</small><b>${fmt(tot[k])}</b></div>`).join("")}</div>
+  </div>
+  <div class="card">
+    ${list.length ? list.map(o=>`
+      <div class="item" data-act="saleEdit" data-id="${o.id}">
+        <div class="ico">🛒</div>
+        <div class="mid"><div>${fd(o.date)}</div><small>${ACCS.filter(k=>o[k]).map(k=>ACC[k].split(" ")[1]+": "+fmt(o[k])).join(" · ")}${o.note?" · "+esc(o.note):""}</small></div>
+        <div class="amt green">${fmt(saleTotal(o))}</div>
+      </div>`).join("") : `<div class="empty">Bu oyda savdo kiritilmagan</div>`}
+  </div>`;
+}
+
+function pExp(){
+  const mk = monthKey(cur);
+  const list = D.ops.filter(o=>(o.kind==="exp"||o.kind==="tr")&&o.date.startsWith(mk)).sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id);
+  const exps = list.filter(o=>o.kind==="exp");
+  const total = sum(exps,o=>o.amount);
+  const byCat = {}; exps.forEach(o=>byCat[o.cat]=(byCat[o.cat]||0)+o.amount);
+  const cats = Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
+  return `${monthBar()}
+  <div class="row2"><button class="addbtn" data-act="expNew">+ Rasxod</button><button class="addbtn ghost" data-act="trNew">↔ O'tkazma</button></div>
+  <div class="card">
+    <div class="lbl">Oy rasxodi</div>
+    <div class="big red">${fmt(total)} so'm</div>
+    ${cats.map(([c,v])=>`<div class="bar"><div class="top"><span>${esc(c)}</span><span>${fmt(v)} · ${Math.round(v/total*100)}%</span></div><div class="track"><div class="fill" style="width:${v/total*100}%"></div></div></div>`).join("")}
+  </div>
+  <div class="card">
+    ${list.length ? list.map(o=> o.kind==="exp" ? `
+      <div class="item" data-act="expEdit" data-id="${o.id}">
+        <div class="ico">💸</div>
+        <div class="mid"><div>${esc(o.cat)}</div><small>${fd(o.date)} · ${ACC[o.acc]}${o.note?" · "+esc(o.note):""}</small></div>
+        <div class="amt red">−${fmt(o.amount)}</div>
+      </div>` : `
+      <div class="item" data-act="trEdit" data-id="${o.id}">
+        <div class="ico">↔</div>
+        <div class="mid"><div>O'tkazma</div><small>${fd(o.date)} · ${ACC[o.acc]} → ${ACC[o.to]}${o.note?" · "+esc(o.note):""}</small></div>
+        <div class="amt">${fmt(o.amount)}</div>
+      </div>`).join("") : `<div class="empty">Bu oyda rasxod yo'q</div>`}
+  </div>`;
+}
+
+function pSup(){
+  const all = D.sups.map(s=>({s,i:supInfo(s)}));
+  const open = all.filter(x=>x.i.rem>0);
+  const late = open.filter(x=>x.i.left<0);
+  let list = supFilter==="open" ? open.sort((a,b)=>a.i.left-b.i.left) : all.sort((a,b)=>b.s.date.localeCompare(a.s.date));
+  return `
+  <div class="card">
+    <div class="lbl">Postavshiklarga umumiy qarzimiz</div>
+    <div class="big red">${fmt(sum(open,x=>x.i.rem))} so'm</div>
+    <div class="grid">
+      <div class="mini"><small>To'lanmagan yuklar</small><b>${open.length} ta</b></div>
+      <div class="mini"><small>Muddati o'tgan</small><b class="${late.length?"red":""}">${late.length} ta · ${fmt(sum(late,x=>x.i.rem))}</b></div>
+    </div>
+  </div>
+  <button class="addbtn" data-act="supNew">+ Yuk keldi</button>
+  <div class="filters">
+    <button class="${supFilter==="open"?"on":""}" data-act="supF" data-v="open">To'lanmagan</button>
+    <button class="${supFilter==="all"?"on":""}" data-act="supF" data-v="all">Hammasi</button>
+  </div>
+  <div class="card">
+    ${list.length ? list.map(x=>`
+      <div class="item" data-act="supOpen" data-id="${x.s.id}">
+        <div class="ico">🚚</div>
+        <div class="mid"><div>${esc(x.s.sup)}</div><small>Keldi: ${fd(x.s.date)} · ${x.s.days} kunga</small>${badge(x.i)}</div>
+        <div class="amt">${fmt(x.s.amount)}${x.i.rem>0&&x.i.paid>0?`<small>qoldi ${fmt(x.i.rem)}</small>`:""}</div>
+      </div>`).join("") : `<div class="empty">${supFilter==="open"?"To'lanmagan yuk yo'q 👍":"Hali yuk kiritilmagan"}</div>`}
+  </div>`;
+}
+
+function pCust(){
+  const list = custList();
+  const owe = list.filter(c=>c.bal>0);
+  return `
+  <div class="card">
+    <div class="lbl">Klientlarning bizga qarzi</div>
+    <div class="big green">${fmt(sum(owe,c=>c.bal))} so'm</div>
+    <div class="lbl">${owe.length} ta klient qarzdor</div>
+  </div>
+  <button class="addbtn" data-act="custNew">+ Qarz berish / To'lov olish</button>
+  <div class="card">
+    ${list.length ? list.map(c=>`
+      <div class="item" data-act="custOpen" data-n="${encodeURIComponent(c.name)}">
+        <div class="ico">👤</div>
+        <div class="mid"><div>${esc(c.name)}</div><small>Oxirgi: ${fd(c.last)}</small></div>
+        <div class="amt ${c.bal>0?"green":""}">${c.bal>0?fmt(c.bal):"Qarzi yo'q"}</div>
+      </div>`).join("") : `<div class="empty">Hali klient qo'shilmagan</div>`}
+  </div>`;
+}
+
+/* ================= Oynalar (forma) ================= */
+function openSheet(html){ F.onChip=null; $("sheet").innerHTML = html; $("sheetBg").classList.add("show"); $("sheet").scrollTop=0; }
+function closeSheet(){ $("sheetBg").classList.remove("show"); }
+const field = (l,inner) => `<label>${l}</label>${inner}`;
+const numIn = (id,v) => `<input class="num" id="${id}" inputmode="numeric" placeholder="0" value="${v?fmt(v):""}">`;
+const dateIn = (id,v) => `<input id="${id}" type="date" value="${v||today()}">`;
+const textIn = (id,v,ph,list) => `<input id="${id}" value="${esc(v)}" placeholder="${ph||""}" ${list?`list="${list}"`:""} autocomplete="off">`;
+function chips(name, opts, sel){ F[name]=sel; return `<div class="chips" data-chip="${name}">${opts.map(([v,l])=>`<button type="button" data-v="${esc(v)}" class="${v===sel?"on":""}">${l}</button>`).join("")}</div>`; }
+const accChips = (name, sel) => chips(name, ACCS.map(k=>[k,ACC[k]]), sel);
+const actions = del => `<div class="actions"><button class="cancel" id="cancelBtn">Bekor</button><button class="save" id="saveBtn">Saqlash</button></div>${del?`<button class="del" id="delBtn">O'chirish</button>`:""}`;
+function bind(onSave, onDel){
+  $("cancelBtn").onclick = closeSheet;
+  $("saveBtn").onclick = onSave;
+  if (onDel && $("delBtn")) $("delBtn").onclick = () => ask("O'chirishni tasdiqlaysizmi?", ()=>{ onDel(); done(); });
+}
+function ask(msg, yes){
+  if (tg && tg.showConfirm && tg.isVersionAtLeast("6.2")) tg.showConfirm(msg, ok=>ok&&yes());
+  else if (confirm(msg)) yes();
+}
+function bad(id){ haptic("error"); const el=$(id); if(el){ el.focus(); el.style.outline="2px solid var(--red)"; setTimeout(()=>el.style.outline="",1200);} }
+function done(keepOpen){ haptic("success"); if(!keepOpen) closeSheet(); save(); render(); }
+
+/* --- Savdo --- */
+function saleSheet(id){
+  const o = id ? D.ops.find(x=>x.id===id) : null;
+  openSheet(`<h2>${o?"Savdoni tahrirlash":"Kunlik savdo"}</h2>
+    ${field("Sana", dateIn("fDate", o&&o.date))}
+    ${ACCS.map(k=>field(ACC[k], numIn("f_"+k, o&&o[k]))).join("")}
+    ${field("Izoh", textIn("fNote", o?o.note:"", "ixtiyoriy"))}
+    ${actions(!!o)}`);
+  bind(()=>{
+    const r = {date:$("fDate").value||today(), note:$("fNote").value.trim()};
+    ACCS.forEach(k=>r[k]=num("f_"+k));
+    if (!saleTotal(r)) return bad("f_naqd");
+    if (o) Object.assign(o,r); else D.ops.push({id:uid(), kind:"sale", ...r});
+    done();
+  }, o && (()=>{ D.ops=D.ops.filter(x=>x!==o); }));
+}
+
+/* --- Rasxod --- */
+function expSheet(id){
+  const o = id ? D.ops.find(x=>x.id===id) : null;
+  openSheet(`<h2>${o?"Rasxodni tahrirlash":"Yangi rasxod"}</h2>
+    ${field("Summa", numIn("fAmt", o&&o.amount))}
+    ${field("Turi", chips("cat", EXP_CATS.map(c=>[c,c]), o?o.cat:"Boshqa"))}
+    ${field("Qayerdan to'landi", accChips("acc", o?o.acc:"naqd"))}
+    ${field("Sana", dateIn("fDate", o&&o.date))}
+    ${field("Izoh", textIn("fNote", o?o.note:"", "masalan: elektr uchun"))}
+    ${actions(!!o)}`);
+  bind(()=>{
+    const amount = num("fAmt"); if (!amount) return bad("fAmt");
+    const r = {amount, cat:F.cat, acc:F.acc, date:$("fDate").value||today(), note:$("fNote").value.trim()};
+    if (o) Object.assign(o,r); else D.ops.push({id:uid(), kind:"exp", ...r});
+    done();
+  }, o && (()=>{ D.ops=D.ops.filter(x=>x!==o); }));
+}
+
+/* --- O'tkazma --- */
+function trSheet(id){
+  const o = id ? D.ops.find(x=>x.id===id) : null;
+  openSheet(`<h2>Hisoblar orasida o'tkazma</h2>
+    <div class="lbl" style="margin-top:4px">Masalan: terminal puli bankka tushdi, naqdni kartaga o'tkazdingiz.</div>
+    ${field("Qayerdan", accChips("from", o?o.acc:"humo"))}
+    ${field("Qayerga", accChips("to", o?o.to:"bank"))}
+    ${field("Summa", numIn("fAmt", o&&o.amount))}
+    ${field("Sana", dateIn("fDate", o&&o.date))}
+    ${field("Izoh", textIn("fNote", o?o.note:"", "ixtiyoriy"))}
+    ${actions(!!o)}`);
+  bind(()=>{
+    const amount = num("fAmt"); if (!amount) return bad("fAmt");
+    if (F.from===F.to) { haptic("error"); return; }
+    const r = {amount, acc:F.from, to:F.to, date:$("fDate").value||today(), note:$("fNote").value.trim()};
+    if (o) Object.assign(o,r); else D.ops.push({id:uid(), kind:"tr", ...r});
+    done();
+  }, o && (()=>{ D.ops=D.ops.filter(x=>x!==o); }));
+}
+
+/* --- Boshlang'ich qoldiq --- */
+function startSheet(){
+  openSheet(`<h2>Boshlang'ich qoldiq</h2>
+    <div class="lbl" style="margin-top:4px">Ilovani ishlata boshlagan paytdagi har bir hisobdagi pul.</div>
+    ${ACCS.map(k=>field(ACC[k], numIn("s_"+k, D.start[k]))).join("")}
+    ${actions(false)}`);
+  bind(()=>{ ACCS.forEach(k=>D.start[k]=num("s_"+k)); done(); });
+}
+
+/* --- Postavshik --- */
+function supNewSheet(){
+  openSheet(`<h2>Yuk keldi</h2>
+    ${field("Postavshik", textIn("fSup","","nomi", "supList"))}<datalist id="supList">${names(D.sups.map(s=>s.sup))}</datalist>
+    ${field("Yuk summasi", numIn("fAmt"))}
+    ${field("Kelgan sana", dateIn("fDate"))}
+    ${field("Necha kunga qarzga berdi", `<input id="fDays" inputmode="numeric" value="15">`)}
+    ${field("Hozir to'langan summa (bo'lsa)", numIn("fPaid"))}
+    <div id="paidAccBox" style="display:none">${field("Qayerdan to'landi", accChips("acc","naqd"))}</div>
+    ${field("Izoh", textIn("fNote","","masalan: nakladnoy №"))}
+    ${actions(false)}`);
+  $("fPaid").addEventListener("input",()=>$("paidAccBox").style.display = num("fPaid")?"block":"none");
+  bind(()=>{
+    const sup = $("fSup").value.trim(); if (!sup) return bad("fSup");
+    const amount = num("fAmt"); if (!amount) return bad("fAmt");
+    const date = $("fDate").value||today();
+    const paid = Math.min(num("fPaid"), amount);
+    D.sups.push({id:uid(), sup, amount, date, days:num("fDays"), note:$("fNote").value.trim(),
+      pays: paid ? [{id:uid(), amount:paid, acc:F.acc, date}] : []});
+    done();
+  });
+}
+
+function supSheet(id){
+  const s = D.sups.find(x=>x.id===id); if (!s) return;
+  const i = supInfo(s);
+  openSheet(`<h2>${esc(s.sup)}</h2>${badge(i)}
+    <div class="box">
+      <div class="line"><span>Yuk summasi</span><b>${fmt(s.amount)}</b></div>
+      <div class="line"><span>To'langan</span><b class="green">${fmt(i.paid)}</b></div>
+      <div class="line"><span>Qolgan qarz</span><b class="red">${fmt(i.rem)}</b></div>
+      <div class="line"><span>Kelgan sana</span><b>${fd(s.date)}</b></div>
+      <div class="line"><span>To'lov muddati</span><b>${fd(i.due)} (${s.days} kun)</b></div>
+      ${s.note?`<div class="line"><span>Izoh</span><b>${esc(s.note)}</b></div>`:""}
+    </div>
+    ${s.pays.length?`<h4>To'lovlar</h4><div class="box">${s.pays.map(p=>`<div class="line"><span>${fd(p.date)} · ${ACC[p.acc]}</span><span><b>${fmt(p.amount)}</b><button class="x" data-payDel="${p.id}">×</button></span></div>`).join("")}</div>`:""}
+    ${i.rem>0?`<h4>To'lov qilish</h4>
+      ${numIn("pAmt", i.rem)}
+      ${field("Qayerdan", accChips("acc","naqd"))}
+      ${field("Sana", dateIn("pDate"))}
+      <div class="actions"><button class="save" id="payBtn">To'lovni saqlash</button></div>`:""}
+    <h4>Ma'lumotni tahrirlash</h4>
+    ${field("Postavshik", textIn("fSup", s.sup))}
+    ${field("Yuk summasi", numIn("fAmt", s.amount))}
+    ${field("Kelgan sana", dateIn("fDate", s.date))}
+    ${field("Necha kunga", `<input id="fDays" inputmode="numeric" value="${s.days}">`)}
+    ${field("Izoh", textIn("fNote", s.note))}
+    ${actions(true)}`);
+  if ($("payBtn")) $("payBtn").onclick = ()=>{
+    const a = num("pAmt"); if (!a) return bad("pAmt");
+    s.pays.push({id:uid(), amount:a, acc:F.acc, date:$("pDate").value||today()});
+    done(true); supSheet(s.id);
+  };
+  $("sheet").querySelectorAll("[data-payDel]").forEach(b=>b.onclick=()=>ask("To'lovni o'chirasizmi?",()=>{
+    s.pays = s.pays.filter(p=>p.id!==+b.dataset.paydel); done(true); supSheet(s.id);
+  }));
+  bind(()=>{
+    const sup=$("fSup").value.trim(); if(!sup) return bad("fSup");
+    const amount=num("fAmt"); if(!amount) return bad("fAmt");
+    Object.assign(s,{sup, amount, date:$("fDate").value||s.date, days:num("fDays"), note:$("fNote").value.trim()});
+    done();
+  }, ()=>{ D.sups=D.sups.filter(x=>x!==s); });
+}
+
+/* --- Klient --- */
+function custSheet(name){
+  const hist = name ? D.cust.filter(c=>c.name===name).sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id) : [];
+  const bal = sum(hist, c=>c.type==="debt"?c.amount:-c.amount);
+  openSheet(`<h2>${name?esc(name):"Qarz berish / To'lov olish"}</h2>
+    ${name?`<div class="box"><div class="line"><span>Hozirgi qarzi</span><b class="${bal>0?"green":""}">${fmt(Math.max(0,bal))} so'm</b></div></div>
+      <h4>Tarix</h4><div class="box">${hist.map(c=>`<div class="line"><span>${fd(c.date)} · ${c.type==="debt"?"Qarz oldi":"To'ladi ("+ACC[c.acc].split(" ").slice(1).join(" ")+")"}${c.note?" · "+esc(c.note):""}</span><span><b class="${c.type==="debt"?"red":"green"}">${c.type==="debt"?"+":"−"}${fmt(c.amount)}</b><button class="x" data-cDel="${c.id}">×</button></span></div>`).join("")}</div>
+      <h4>Yangi yozuv</h4>`
+    : field("Klient ismi", textIn("fName","","ism yoki telefon","custList"))+`<datalist id="custList">${names(D.cust.map(c=>c.name))}</datalist>`}
+    ${field("Turi", chips("type", [["debt","➕ Qarzga mol berdik"],["pay","✅ Qarzini to'ladi"]], name&&bal>0?"pay":"debt"))}
+    ${field("Summa", numIn("fAmt", name&&bal>0?bal:0))}
+    <div id="accBox" style="display:${name&&bal>0?"block":"none"}">${field("Qayerga tushdi", accChips("acc","naqd"))}</div>
+    ${field("Sana", dateIn("fDate"))}
+    ${field("Izoh", textIn("fNote","","ixtiyoriy"))}
+    ${actions(false)}`);
+  F.onChip = (n,v)=>{ if(n==="type") $("accBox").style.display = v==="pay"?"block":"none"; };
+  $("sheet").querySelectorAll("[data-cDel]").forEach(b=>b.onclick=()=>ask("Yozuvni o'chirasizmi?",()=>{
+    D.cust = D.cust.filter(c=>c.id!==+b.dataset.cdel); done(true);
+    D.cust.some(c=>c.name===name) ? custSheet(name) : closeSheet();
+  }));
+  bind(()=>{
+    const nm = name || $("fName").value.trim(); if (!nm) return bad("fName");
+    const amount = num("fAmt"); if (!amount) return bad("fAmt");
+    const r = {id:uid(), name:nm, type:F.type, amount, date:$("fDate").value||today(), note:$("fNote").value.trim()};
+    if (F.type==="pay") r.acc = F.acc;
+    D.cust.push(r);
+    done(true); custSheet(nm);
+  });
+}
+
+/* ================= Hodisalar ================= */
+document.addEventListener("input", e=>{
+  if (e.target.classList.contains("num")) {
+    const d = e.target.value.replace(/\D/g,"").slice(0,13);
+    e.target.value = d ? fmt(+d) : "";
+  }
+});
+document.addEventListener("click", e=>{
+  const chip = e.target.closest("[data-chip] button");
+  if (chip) {
+    const box = chip.parentElement, n = box.dataset.chip, v = chip.dataset.v;
+    box.querySelectorAll("button").forEach(b=>b.classList.toggle("on", b===chip));
+    F[n] = v; F.onChip && F.onChip(n,v);
+    return;
+  }
+  const el = e.target.closest("[data-act]"); if (!el) return;
+  const a = el.dataset.act, id = +el.dataset.id;
+  if (a==="tab") { tab = el.dataset.t; window.scrollTo(0,0); render(); }
+  else if (a==="mnav") { cur.setMonth(cur.getMonth() + +el.dataset.d); render(); }
+  else if (a==="saleNew") saleSheet();
+  else if (a==="saleEdit") saleSheet(id);
+  else if (a==="expNew") expSheet();
+  else if (a==="expEdit") expSheet(id);
+  else if (a==="trNew") trSheet();
+  else if (a==="trEdit") trSheet(id);
+  else if (a==="startBal") startSheet();
+  else if (a==="supNew") supNewSheet();
+  else if (a==="supOpen") supSheet(id);
+  else if (a==="supF") { supFilter = el.dataset.v; render(); }
+  else if (a==="custNew") custSheet();
+  else if (a==="custOpen") custSheet(decodeURIComponent(el.dataset.n));
+});
+$("sheetBg").addEventListener("click", e=>{ if (e.target.id==="sheetBg") closeSheet(); });
+
+load();
+</script>
+</body>
+</html>
