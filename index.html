@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Do'kon hisobi</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{
   --bg:var(--tg-theme-bg-color,#ffffff);
@@ -79,6 +80,16 @@ input.num{font-weight:700;font-size:18px}
 .x{background:none;border:none;color:var(--red);font-size:18px;padding:0 4px}
 .box{background:var(--bg2);border-radius:12px;padding:10px 12px;margin-top:8px}
 .box .line{border-bottom-color:var(--bg)}
+.thumbs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:6px 0 8px}
+.thumbs:empty{display:none}
+.thumb{position:relative;aspect-ratio:3/4;border-radius:10px;overflow:hidden;background:var(--bg2)}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.thumb .rm{position:absolute;top:4px;right:4px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:26px;height:26px;font-size:16px;line-height:26px}
+label.photoBtn{display:block;text-align:center;padding:12px;border-radius:10px;border:2px dashed var(--hint);color:var(--btn);font-weight:600;font-size:15px;margin:4px 0 0}
+#viewer{position:fixed;inset:0;background:#000;z-index:20;display:none;align-items:center;justify-content:center}
+#viewer.show{display:flex}
+#viewer img{max-width:100%;max-height:100%;object-fit:contain}
+#viewer button{position:absolute;top:12px;right:12px;background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:50%;width:40px;height:40px;font-size:20px}
 </style>
 </head>
 <body>
@@ -94,6 +105,7 @@ input.num{font-weight:700;font-size:18px}
 </nav>
 
 <div class="sheet-bg" id="sheetBg"><div class="sheet" id="sheet"></div></div>
+<div id="viewer"><img id="viewerImg" alt=""><button>✕</button></div>
 
 <script>
 const tg = (window.Telegram && Telegram.WebApp) ? Telegram.WebApp : null;
@@ -104,6 +116,13 @@ const ACC = {naqd:"💵 Naqd", humo:"💳 Humo terminal", uzcard:"💳 Uzcard te
 const ACCS = Object.keys(ACC);
 const EXP_CATS = ["Ijara","Oylik","Kommunal","Transport","Soliq","Xo'jalik","Ovqat","Boshqa"];
 const MONTHS = ["Yanvar","Fevral","Mart","Aprel","May","Iyun","Iyul","Avgust","Sentabr","Oktabr","Noyabr","Dekabr"];
+
+/* Rasmlar saqlanadigan joy (Supabase) */
+const SB_URL = "https://eormaktfhkaygogibtul.supabase.co";
+const SB_KEY = "sb_publishable_ZjYSyCeCyJ4_5IB2qO7nCA_9K52egUG";
+const BUCKET = "nakladnoy";
+let SB = null;
+try { SB = window.supabase.createClient(SB_URL, SB_KEY, {auth:{persistSession:false}}); } catch(e){}
 
 let D = { ops:[], sups:[], cust:[], start:{} };
 let tab = "home", cur = new Date(), supFilter = "open", F = {};
@@ -124,6 +143,33 @@ const num = id => +(($(id)?.value||"").replace(/\D/g,"")) || 0;
 const sum = (a,f) => a.reduce((s,x)=>s+f(x),0);
 const haptic = t => { try { tg && tg.HapticFeedback.notificationOccurred(t); } catch(e){} };
 const saleTotal = o => sum(ACCS, k=>o[k]||0);
+
+/* ---------- Rasmlar ---------- */
+const photoUrl = p => p.startsWith("blob:") ? p : `${SB_URL}/storage/v1/object/public/${BUCKET}/${p}`;
+async function compress(file){
+  const src = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=src; });
+    const k = Math.min(1, 1600/Math.max(img.width,img.height));
+    const c = document.createElement("canvas"); c.width=Math.round(img.width*k); c.height=Math.round(img.height*k);
+    c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+    return await new Promise(r=>c.toBlob(r,"image/jpeg",0.8));
+  } finally { URL.revokeObjectURL(src); }
+}
+async function uploadPhoto(file){
+  if (!SB) throw new Error("Internet yoki ulanishda muammo");
+  const blob = await compress(file);
+  const who = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) || "web";
+  const rnd = (crypto.randomUUID ? crypto.randomUUID() : String(uid())+Math.random().toString(36).slice(2));
+  const path = `${who}/${today()}/${rnd}.jpg`;
+  const { error } = await SB.storage.from(BUCKET).upload(path, blob, {contentType:"image/jpeg", upsert:false});
+  if (error) throw error;
+  return path;
+}
+function alertMsg(m){ if (tg && tg.showAlert && tg.isVersionAtLeast("6.2")) tg.showAlert(m); else alert(m); }
+function showPhoto(url){ $("viewerImg").src=url; $("viewer").classList.add("show"); }
+const thumbsHtml = (list, rmAttr) => list.map((p,i)=>`<div class="thumb"><img src="${esc(photoUrl(p))}" data-view="${esc(photoUrl(p))}" loading="lazy" alt=""><button class="rm" ${rmAttr}="${i}">×</button></div>`).join("");
+const photoPicker = () => `<label class="photoBtn" id="photoLbl">📷 Rasm qo'shish<input type="file" accept="image/*" multiple id="fPhoto" hidden></label>`;
 
 function balances(){
   const b = {}; ACCS.forEach(k=>b[k]=D.start[k]||0);
@@ -323,7 +369,7 @@ function pSup(){
     ${list.length ? list.map(x=>`
       <div class="item" data-act="supOpen" data-id="${x.s.id}">
         <div class="ico">🚚</div>
-        <div class="mid"><div>${esc(x.s.sup)}</div><small>Keldi: ${fd(x.s.date)} · ${x.s.days} kunga</small>${badge(x.i)}</div>
+        <div class="mid"><div>${esc(x.s.sup)}</div><small>Keldi: ${fd(x.s.date)} · ${x.s.days} kunga${(x.s.photos||[]).length?` · 📎 ${x.s.photos.length}`:""}</small>${badge(x.i)}</div>
         <div class="amt">${fmt(x.s.amount)}${x.i.rem>0&&x.i.paid>0?`<small>qoldi ${fmt(x.i.rem)}</small>`:""}</div>
       </div>`).join("") : `<div class="empty">${supFilter==="open"?"To'lanmagan yuk yo'q 👍":"Hali yuk kiritilmagan"}</div>`}
   </div>`;
@@ -445,15 +491,34 @@ function supNewSheet(){
     ${field("Hozir to'langan summa (bo'lsa)", numIn("fPaid"))}
     <div id="paidAccBox" style="display:none">${field("Qayerdan to'landi", accChips("acc","naqd"))}</div>
     ${field("Izoh", textIn("fNote","","masalan: nakladnoy №"))}
+    ${field("Nakladnoy rasmlari", `<div class="thumbs" id="thumbs"></div>${photoPicker()}`)}
     ${actions(false)}`);
+  const pend = [];
+  const drawPend = () => {
+    $("thumbs").innerHTML = thumbsHtml(pend.map(x=>x.url), "data-rmp");
+    $("thumbs").querySelectorAll("[data-rmp]").forEach(b=>b.onclick=e=>{ e.stopPropagation(); const [x]=pend.splice(+b.dataset.rmp,1); URL.revokeObjectURL(x.url); drawPend(); });
+  };
+  $("fPhoto").onchange = e => { [...e.target.files].forEach(f=>pend.push({file:f, url:URL.createObjectURL(f)})); e.target.value=""; drawPend(); };
   $("fPaid").addEventListener("input",()=>$("paidAccBox").style.display = num("fPaid")?"block":"none");
-  bind(()=>{
+  bind(async()=>{
     const sup = $("fSup").value.trim(); if (!sup) return bad("fSup");
     const amount = num("fAmt"); if (!amount) return bad("fAmt");
     const date = $("fDate").value||today();
     const paid = Math.min(num("fPaid"), amount);
-    D.sups.push({id:uid(), sup, amount, date, days:num("fDays"), note:$("fNote").value.trim(),
+    const btn = $("saveBtn"); if (btn.disabled) return;
+    const photos = [];
+    if (pend.length) {
+      btn.disabled = true;
+      try {
+        for (let i=0;i<pend.length;i++){ btn.textContent = `Rasm yuklanmoqda ${i+1}/${pend.length}...`; photos.push(await uploadPhoto(pend[i].file)); }
+      } catch(e) {
+        btn.disabled = false; btn.textContent = "Saqlash";
+        return alertMsg("Rasm yuklanmadi. Internetni tekshirib, qayta urinib ko'ring.\n\n" + (e.message||e));
+      }
+    }
+    D.sups.push({id:uid(), sup, amount, date, days:num("fDays"), note:$("fNote").value.trim(), photos,
       pays: paid ? [{id:uid(), amount:paid, acc:F.acc, date}] : []});
+    pend.forEach(x=>URL.revokeObjectURL(x.url));
     done();
   });
 }
@@ -470,6 +535,9 @@ function supSheet(id){
       <div class="line"><span>To'lov muddati</span><b>${fd(i.due)} (${s.days} kun)</b></div>
       ${s.note?`<div class="line"><span>Izoh</span><b>${esc(s.note)}</b></div>`:""}
     </div>
+    <h4>Nakladnoy rasmlari</h4>
+    <div class="thumbs">${thumbsHtml(s.photos||[], "data-rmph")}</div>
+    ${photoPicker()}
     ${s.pays.length?`<h4>To'lovlar</h4><div class="box">${s.pays.map(p=>`<div class="line"><span>${fd(p.date)} · ${ACC[p.acc]}</span><span><b>${fmt(p.amount)}</b><button class="x" data-payDel="${p.id}">×</button></span></div>`).join("")}</div>`:""}
     ${i.rem>0?`<h4>To'lov qilish</h4>
       ${numIn("pAmt", i.rem)}
@@ -483,6 +551,19 @@ function supSheet(id){
     ${field("Necha kunga", `<input id="fDays" inputmode="numeric" value="${s.days}">`)}
     ${field("Izoh", textIn("fNote", s.note))}
     ${actions(true)}`);
+  $("fPhoto").onchange = async e => {
+    const files = [...e.target.files]; e.target.value = ""; if (!files.length) return;
+    const lbl = $("photoLbl"), keep = lbl.firstChild.textContent;
+    try {
+      for (let i=0;i<files.length;i++){ lbl.firstChild.textContent = `Yuklanmoqda ${i+1}/${files.length}...`; const p = await uploadPhoto(files[i]); (s.photos=s.photos||[]).push(p); }
+      done(true); supSheet(s.id);
+    } catch(err) {
+      lbl.firstChild.textContent = keep;
+      if ((s.photos||[]).length) { save(); render(); }
+      alertMsg("Rasm yuklanmadi. Internetni tekshirib, qayta urinib ko'ring.\n\n" + (err.message||err));
+    }
+  };
+  $("sheet").querySelectorAll("[data-rmph]").forEach(b=>b.onclick=e=>{ e.stopPropagation(); ask("Rasmni o'chirasizmi?",()=>{ s.photos.splice(+b.dataset.rmph,1); done(true); supSheet(s.id); }); });
   if ($("payBtn")) $("payBtn").onclick = ()=>{
     const a = num("pAmt"); if (!a) return bad("pAmt");
     s.pays.push({id:uid(), amount:a, acc:F.acc, date:$("pDate").value||today()});
@@ -561,7 +642,11 @@ document.addEventListener("click", e=>{
   else if (a==="custNew") custSheet();
   else if (a==="custOpen") custSheet(decodeURIComponent(el.dataset.n));
 });
-$("sheetBg").addEventListener("click", e=>{ if (e.target.id==="sheetBg") closeSheet(); });
+$("sheetBg").addEventListener("click", e=>{
+  const v = e.target.closest("[data-view]"); if (v) return showPhoto(v.dataset.view);
+  if (e.target.id==="sheetBg") closeSheet();
+});
+$("viewer").addEventListener("click", ()=>$("viewer").classList.remove("show"));
 
 load();
 </script>
