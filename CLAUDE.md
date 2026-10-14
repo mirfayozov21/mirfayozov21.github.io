@@ -50,7 +50,8 @@ Tabs: Asosiy (accounts in UZS/USD, net worth via `D.rate`), Kirim-chiqim (`kind:
 different currencies stores `amountTo` and updates `D.rate`), Qarzlar (`D.debts` `{dir:"gave"|"took", cur, amount, acc?, due, pays}`),
 Kredit (`D.loans` `{total, monthly, day, cur, pays}`; pays with `pre:true` = paid before tracking, no account;
 optional `sched:[{date, prin, int}]` = bank schedule with different amounts/dates, see `schedInfo()`; one-time seeded loans are
-recorded in `D.seeds` so they are never re-added after the user deletes them; seeds: `ixtiyor-2026`, `agrobank-mikroqarz-2026`).
+recorded in `D.seeds` so they are never re-added after the user deletes them; seeds: `ixtiyor-2026`, `agrobank-mikroqarz-2026`, `avo-bank-2026`).
+  A loan with `monthly:0` and no `sched` is a simple balance ("Grafiksiz"): no due date/warnings, payments just reduce it.
 `D = {accs, ops, debts, loans, rate}`; storage keys are separate from the shop app: localStorage `shaxsiy_v1`,
 CloudStorage `p0..pN` + `pn`. Do not share code paths/keys between the two apps.
 
