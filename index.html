@@ -80,6 +80,11 @@ input.num{font-weight:700;font-size:18px}
 .x{background:none;border:none;color:var(--red);font-size:18px;padding:0 4px}
 .box{background:var(--bg2);border-radius:12px;padding:10px 12px;margin-top:8px}
 .box .line{border-bottom-color:var(--bg)}
+.vchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.vchips button{border:none;background:var(--bg2);color:var(--text);padding:8px 12px;border-radius:20px;font-size:14px}
+.vchips button.on{background:var(--btn);color:var(--btnText)}
+.vchips .newv{background:none;border:1px dashed var(--hint);color:var(--hint)}
+.callbtn{display:inline-block;margin-top:6px;color:var(--btn);text-decoration:none;font-weight:600}
 .thumbs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:6px 0 8px}
 .thumbs:empty{display:none}
 .thumb{position:relative;aspect-ratio:3/4;border-radius:10px;overflow:hidden;background:var(--bg2)}
@@ -124,7 +129,7 @@ const BUCKET = "nakladnoy";
 let SB = null;
 try { SB = window.supabase.createClient(SB_URL, SB_KEY, {auth:{persistSession:false}}); } catch(e){}
 
-let D = { ops:[], sups:[], cust:[], start:{} };
+let D = { ops:[], sups:[], cust:[], start:{}, vendors:[] };
 let tab = "home", cur = new Date(), supFilter = "open", F = {};
 cur.setDate(1);
 
@@ -133,7 +138,7 @@ const $ = id => document.getElementById(id);
 const fmt = n => Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g," ");
 const sm = n => (n<0?"−":"")+fmt(Math.abs(n));
 const esc = s => String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const uid = () => Date.now()*100 + Math.floor(Math.random()*100);
+let _u = 0; const uid = () => Date.now()*1000 + (_u++ % 1000);
 const today = () => { const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); };
 const dnum = s => Math.round(Date.UTC(+s.slice(0,4), +s.slice(5,7)-1, +s.slice(8,10))/864e5);
 const addDays = (s,n) => new Date(Date.UTC(+s.slice(0,4), +s.slice(5,7)-1, +s.slice(8,10)+n)).toISOString().slice(0,10);
@@ -207,7 +212,25 @@ const CHUNK = 3800, LS = "dokon_v2";
 const csGet = keys => new Promise(r => CS.getItems(keys,(e,v)=>r(e?{}:v||{})));
 const csSet = (k,v) => new Promise(r => CS.setItem(k,v,()=>r()));
 const csDel = keys => new Promise(r => keys.length ? CS.removeItems(keys,()=>r()) : r());
-function normalize(d){ return { ops:d.ops||[], sups:d.sups||[], cust:d.cust||[], start:d.start||{} }; }
+function normalize(d){
+  const r = { ops:d.ops||[], sups:d.sups||[], cust:d.cust||[], start:d.start||{}, vendors:d.vendors||[] };
+  r.sups.slice().sort((a,b)=>a.date.localeCompare(b.date)).forEach(x=>ensureVendor(x.sup, x.days, r));
+  return r;
+}
+const vkey = n => String(n||"").trim().toLowerCase();
+function findVendor(name, r){ r=r||D; const k=vkey(name); return r.vendors.find(v=>vkey(v.name)===k); }
+function ensureVendor(name, days, r){
+  r=r||D; if (!vkey(name)) return null;
+  let v = findVendor(name, r);
+  if (!v) { v = {id:uid(), name:String(name).trim(), phone:"", days: days||15}; r.vendors.push(v); }
+  return v;
+}
+function vendorStats(){
+  const m = {};
+  D.vendors.forEach(v=>m[vkey(v.name)]={v, last:"", debt:0, late:0, cnt:0});
+  D.sups.forEach(x=>{ const o=m[vkey(x.sup)]; if(!o) return; const i=supInfo(x); o.cnt++; o.debt+=i.rem; if(i.rem>0&&i.left<0) o.late++; if(x.date>o.last) o.last=x.date; });
+  return Object.values(m);
+}
 
 async function load(){
   try { const s=localStorage.getItem(LS); if(s) D=normalize(JSON.parse(s)); } catch(e){}
@@ -351,6 +374,7 @@ function pSup(){
   const open = all.filter(x=>x.i.rem>0);
   const late = open.filter(x=>x.i.left<0);
   let list = supFilter==="open" ? open.sort((a,b)=>a.i.left-b.i.left) : all.sort((a,b)=>b.s.date.localeCompare(a.s.date));
+  const vs = vendorStats().sort((a,b)=>b.debt-a.debt || b.last.localeCompare(a.last));
   return `
   <div class="card">
     <div class="lbl">Postavshiklarga umumiy qarzimiz</div>
@@ -364,7 +388,18 @@ function pSup(){
   <div class="filters">
     <button class="${supFilter==="open"?"on":""}" data-act="supF" data-v="open">To'lanmagan</button>
     <button class="${supFilter==="all"?"on":""}" data-act="supF" data-v="all">Hammasi</button>
+    <button class="${supFilter==="vend"?"on":""}" data-act="supF" data-v="vend">Ro'yxat (${D.vendors.length})</button>
   </div>
+  ${supFilter==="vend" ? `
+  <div class="card">
+    ${vs.length ? vs.map(o=>`
+      <div class="item" data-act="vendOpen" data-id="${o.v.id}">
+        <div class="ico">🏢</div>
+        <div class="mid"><div>${esc(o.v.name)}</div><small>${o.cnt} ta yuk · ${o.v.days} kunlik qarz${o.v.phone?" · "+esc(o.v.phone):""}</small>${o.late?`<span class="bdg bad">${o.late} ta muddati o'tgan</span>`:""}</div>
+        <div class="amt ${o.debt>0?"red":""}">${o.debt>0?fmt(o.debt):"Qarz yo'q"}</div>
+      </div>`).join("") : `<div class="empty">Ro'yxat bo'sh</div>`}
+    <button class="addbtn ghost" style="background:var(--bg2);margin:10px 0 0" data-act="vendNew">+ Postavshik qo'shish</button>
+  </div>` : `
   <div class="card">
     ${list.length ? list.map(x=>`
       <div class="item" data-act="supOpen" data-id="${x.s.id}">
@@ -372,7 +407,7 @@ function pSup(){
         <div class="mid"><div>${esc(x.s.sup)}</div><small>Keldi: ${fd(x.s.date)} · ${x.s.days} kunga${(x.s.photos||[]).length?` · 📎 ${x.s.photos.length}`:""}</small>${badge(x.i)}</div>
         <div class="amt">${fmt(x.s.amount)}${x.i.rem>0&&x.i.paid>0?`<small>qoldi ${fmt(x.i.rem)}</small>`:""}</div>
       </div>`).join("") : `<div class="empty">${supFilter==="open"?"To'lanmagan yuk yo'q 👍":"Hali yuk kiritilmagan"}</div>`}
-  </div>`;
+  </div>`}`;
 }
 
 function pCust(){
@@ -482,17 +517,37 @@ function startSheet(){
 }
 
 /* --- Postavshik --- */
-function supNewSheet(){
+function vendorPicker(){
+  const last = {}; D.sups.forEach(x=>{ const k=vkey(x.sup); if(!last[k]||x.date>last[k]) last[k]=x.date; });
+  const draw = () => {
+    const q = vkey($("fSup").value);
+    const list = D.vendors.slice().sort((a,b)=>(last[vkey(b.name)]||"").localeCompare(last[vkey(a.name)]||"") || a.name.localeCompare(b.name))
+      .filter(v=>!q || vkey(v.name).includes(q)).slice(0, q?20:12);
+    const exact = findVendor($("fSup").value);
+    $("vendChips").innerHTML = list.map(v=>`<button type="button" data-vid="${v.id}" class="${exact&&exact.id===v.id?"on":""}">${esc(v.name)}</button>`).join("")
+      + (q && !exact ? `<button type="button" class="newv" disabled>➕ Yangi postavshik: ${esc($("fSup").value.trim())}</button>` : "")
+      + (!D.vendors.length && !q ? `<span class="lbl">Birinchi postavshik nomini yozing</span>` : "");
+    $("vendChips").querySelectorAll("[data-vid]").forEach(b=>b.onclick=()=>{
+      const v = D.vendors.find(x=>x.id===+b.dataset.vid);
+      $("fSup").value = v.name; if ($("fDays")) $("fDays").value = v.days; draw();
+    });
+  };
+  $("fSup").addEventListener("input", draw); draw();
+}
+
+function supNewSheet(pre){
+  const pv = pre ? findVendor(pre) : null;
   openSheet(`<h2>Yuk keldi</h2>
-    ${field("Postavshik", textIn("fSup","","nomi", "supList"))}<datalist id="supList">${names(D.sups.map(s=>s.sup))}</datalist>
+    ${field("Postavshik", textIn("fSup", pv?pv.name:"", "qidirish yoki yangi nom"))}<div class="vchips" id="vendChips"></div>
     ${field("Yuk summasi", numIn("fAmt"))}
     ${field("Kelgan sana", dateIn("fDate"))}
-    ${field("Necha kunga qarzga berdi", `<input id="fDays" inputmode="numeric" value="15">`)}
+    ${field("Necha kunga qarzga berdi", `<input id="fDays" inputmode="numeric" value="${pv?pv.days:15}">`)}
     ${field("Hozir to'langan summa (bo'lsa)", numIn("fPaid"))}
     <div id="paidAccBox" style="display:none">${field("Qayerdan to'landi", accChips("acc","naqd"))}</div>
     ${field("Izoh", textIn("fNote","","masalan: nakladnoy №"))}
     ${field("Nakladnoy rasmlari", `<div class="thumbs" id="thumbs"></div>${photoPicker()}`)}
     ${actions(false)}`);
+  vendorPicker();
   const pend = [];
   const drawPend = () => {
     $("thumbs").innerHTML = thumbsHtml(pend.map(x=>x.url), "data-rmp");
@@ -516,7 +571,8 @@ function supNewSheet(){
         return alertMsg("Rasm yuklanmadi. Internetni tekshirib, qayta urinib ko'ring.\n\n" + (e.message||e));
       }
     }
-    D.sups.push({id:uid(), sup, amount, date, days:num("fDays"), note:$("fNote").value.trim(), photos,
+    ensureVendor(sup, num("fDays"));
+    D.sups.push({id:uid(), sup:findVendor(sup).name, amount, date, days:num("fDays"), note:$("fNote").value.trim(), photos,
       pays: paid ? [{id:uid(), amount:paid, acc:F.acc, date}] : []});
     pend.forEach(x=>URL.revokeObjectURL(x.url));
     done();
@@ -575,9 +631,45 @@ function supSheet(id){
   bind(()=>{
     const sup=$("fSup").value.trim(); if(!sup) return bad("fSup");
     const amount=num("fAmt"); if(!amount) return bad("fAmt");
-    Object.assign(s,{sup, amount, date:$("fDate").value||s.date, days:num("fDays"), note:$("fNote").value.trim()});
+    ensureVendor(sup, num("fDays"));
+    Object.assign(s,{sup:findVendor(sup).name, amount, date:$("fDate").value||s.date, days:num("fDays"), note:$("fNote").value.trim()});
     done();
   }, ()=>{ D.sups=D.sups.filter(x=>x!==s); });
+}
+
+/* --- Postavshik (ro'yxat) --- */
+function vendSheet(id){
+  const v = id ? D.vendors.find(x=>x.id===id) : null;
+  const items = v ? D.sups.filter(x=>vkey(x.sup)===vkey(v.name)).map(x=>({s:x,i:supInfo(x)})).sort((a,b)=>b.s.date.localeCompare(a.s.date)) : [];
+  const debt = sum(items, x=>x.i.rem);
+  openSheet(`<h2>${v?esc(v.name):"Yangi postavshik"}</h2>
+    ${v&&v.phone?`<a class="callbtn" href="tel:${esc(v.phone.replace(/[^+\d]/g,""))}">📞 ${esc(v.phone)}</a>`:""}
+    ${v?`<div class="box">
+      <div class="line"><span>Qarzimiz</span><b class="${debt>0?"red":""}">${fmt(debt)} so'm</b></div>
+      <div class="line"><span>Jami yuklar</span><b>${items.length} ta · ${fmt(sum(items,x=>x.s.amount))}</b></div>
+    </div>
+    <div class="actions"><button class="save" id="vNewSup">+ Shu postavshikdan yuk keldi</button></div>
+    ${items.length?`<h4>Yuklar</h4><div class="box">${items.map(x=>`<div class="item" data-act="supOpen" data-id="${x.s.id}" style="border-bottom-color:var(--bg)">
+      <div class="mid"><div>${fd(x.s.date)} · ${fmt(x.s.amount)}</div>${badge(x.i)}</div>
+      <div class="amt">${x.i.rem>0?`<span class="red">${fmt(x.i.rem)}</span>`:""}${(x.s.photos||[]).length?`<small>📎 ${x.s.photos.length}</small>`:""}</div></div>`).join("")}</div>`:""}
+    <h4>Ma'lumotlar</h4>`:""}
+    ${field("Nomi", textIn("vName", v?v.name:"", "masalan: Coca-Cola"))}
+    ${field("Telefon", `<input id="vPhone" type="tel" value="${esc(v?v.phone:"")}" placeholder="+998 ..">`)}
+    ${field("Odatda necha kunga qarzga beradi", `<input id="vDays" inputmode="numeric" value="${v?v.days:15}">`)}
+    ${actions(!!v && !items.length)}
+    ${v&&items.length?`<div class="lbl" style="text-align:center;margin-top:8px">Yuklari bor postavshikni o'chirib bo'lmaydi</div>`:""}`);
+  if ($("vNewSup")) $("vNewSup").onclick = ()=>supNewSheet(v.name);
+  bind(()=>{
+    const name = $("vName").value.trim(); if (!name) return bad("vName");
+    const other = findVendor(name); if (other && other!==v) { alertMsg("Bu nomli postavshik ro'yxatda bor"); return bad("vName"); }
+    const days = num("vDays")||15, phone = $("vPhone").value.trim();
+    if (v) {
+      const old = vkey(v.name);
+      D.sups.forEach(x=>{ if (vkey(x.sup)===old) x.sup = name; });
+      Object.assign(v, {name, phone, days});
+    } else D.vendors.push({id:uid(), name, phone, days});
+    done();
+  }, v && (()=>{ D.vendors = D.vendors.filter(x=>x!==v); }));
 }
 
 /* --- Klient --- */
@@ -639,6 +731,8 @@ document.addEventListener("click", e=>{
   else if (a==="supNew") supNewSheet();
   else if (a==="supOpen") supSheet(id);
   else if (a==="supF") { supFilter = el.dataset.v; render(); }
+  else if (a==="vendNew") vendSheet();
+  else if (a==="vendOpen") vendSheet(id);
   else if (a==="custNew") custSheet();
   else if (a==="custOpen") custSheet(decodeURIComponent(el.dataset.n));
 });
