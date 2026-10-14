@@ -144,7 +144,7 @@ const accCur = id => (acc(id)||{}).cur || "UZS";
 const accName = id => (acc(id)||{}).name || "?";
 
 function normalize(d){
-  const r = { accs:d.accs||[], ops:d.ops||[], debts:d.debts||[], loans:d.loans||[], rate:d.rate||12800 };
+  const r = { accs:d.accs||[], ops:d.ops||[], debts:d.debts||[], loans:d.loans||[], rate:d.rate||12800, seeds:d.seeds||[] };
   if (!r.accs.length) r.accs = [
     {id:uid(), name:"💵 Naqd", cur:"UZS", start:0},
     {id:uid(), name:"💳 Karta", cur:"UZS", start:0},
@@ -184,6 +184,7 @@ function dueBadge(rem, left, doneText){
   return `<span class="bdg">${left} kun qoldi</span>`;
 }
 function loanInfo(l){
+  if (l.sched) return schedInfo(l);
   const paid = sum(l.pays,p=>p.amount), rem = Math.max(0, l.total-paid);
   const t = today(), mk = t.slice(0,7);
   const paidThisMonth = sum(l.pays.filter(p=>!p.pre && p.date.startsWith(mk)), p=>p.amount);
@@ -200,6 +201,27 @@ function loanInfo(l){
   const monthsLeft = l.monthly ? Math.ceil(rem/l.monthly) : 0;
   return {paid, rem, due, left, monthDone, nextAmt, monthsLeft, paidThisMonth};
 }
+/* Grafik bo'yicha kredit: har oy summasi va sanasi har xil (l.sched = [{date, prin, int}]) */
+const r2 = n => Math.round(n*100)/100;
+function schedRows(l){
+  const paid = sum(l.pays,p=>p.amount); let acc = 0;
+  return l.sched.map((s,k)=>{
+    const amt = r2(s.prin+s.int), from = acc; acc = r2(acc+amt);
+    const got = Math.max(0, Math.min(amt, paid-from));
+    return {...s, n:k+1, amt, got, left:r2(amt-got), done: amt-got < 1};
+  });
+}
+function schedInfo(l){
+  const rows = schedRows(l), t = today(), mk = t.slice(0,7);
+  const paid = sum(l.pays,p=>p.amount), rem = Math.max(0, r2(l.total-paid));
+  const nx = rows.find(r=>!r.done);
+  const due = nx ? nx.date : t;
+  const left = dnum(due)-dnum(t);
+  const monthDone = !!nx && nx.date.slice(0,7) > mk;
+  const monthsLeft = rows.filter(r=>!r.done).length;
+  return {paid, rem, due, left, monthDone, nextAmt: nx ? nx.left : 0, monthsLeft, paidThisMonth:0, rows, nx};
+}
+
 function loanBadge(i){
   if (i.rem<=0) return `<span class="bdg ok">To'liq yopilgan</span>`;
   if (i.monthDone) return `<span class="bdg ok">Bu oy to'langan · keyingisi ${fd(i.due)}</span>`;
@@ -213,19 +235,34 @@ const csGet = keys => new Promise(r => CS.getItems(keys,(e,v)=>r(e?{}:v||{})));
 const csSet = (k,v) => new Promise(r => CS.setItem(k,v,()=>r()));
 const csDel = keys => new Promise(r => keys.length ? CS.removeItems(keys,()=>r()) : r());
 
+/* Bir martalik: "IXTIYOR STATIONERY" krediti (grafik, avgust–oktyabr 2026 to'langan) */
+const SEED_ID = "ixtiyor-2026";
+const IXTIYOR = `2026-08-10|0|9830136.99,2026-09-10|0|11720547.95,2026-10-12|0|12098630.14,2026-11-10|0|10964383.56,2026-12-10|0|11342465.75,2027-01-11|0|12098630.14,2027-02-10|20000000|11342465.75,2027-03-10|20000000|10233424.66,2027-04-12|20000000|11644931.51,2027-05-10|20000000|9527671.23,2027-06-10|20000000|10157808.22,2027-07-12|20000000|10082191.78,2027-08-10|20000000|8771506.85,2027-09-10|20000000|8985753.42,2027-10-11|20000000|8595068.49,2027-11-10|20000000|7939726.03,2027-12-10|20000000|7561643.84,2028-01-10|20000000|7423013.70,2028-02-10|20000000|7032328.77,2028-03-10|20000000|6213150.68,2028-04-10|20000000|6250958.90,2028-05-10|20000000|5671232.88,2028-06-12|20000000|5822465.75,2028-07-10|20000000|4587397.26,2028-08-10|20000000|4688219.18,2028-09-11|20000000|4436164.38,2028-10-10|20000000|3654794.52,2028-11-10|20000000|3516164.38,2028-12-11|20000000|3125479.45,2029-01-10|20000000|2646575.34,2029-02-12|20000000|2495342.47,2029-03-12|20000000|1764383.56,2029-04-10|20000000|1461917.81,2029-05-10|20000000|1134246.58,2029-06-11|20000000|806575.34,2029-07-14|20000000|414859.15`;
+function seedLoans(){
+  if (D.seeds.includes(SEED_ID)) return;
+  const sched = IXTIYOR.split(",").map(x=>{ const [date,p,i]=x.split("|"); return {date, prin:+p, int:+i}; });
+  const total = r2(sum(sched,s=>s.prin+s.int));
+  D.loans.push({id:uid(), name:'"IXTIYOR STATIONERY" MCHJ krediti', cur:"UZS", total, monthly:0, day:10, start:"2026-07-15", sched,
+    info:[["Kredit summasi","600 000 000 so'm"],["Foiz","23% (o'zgarmas)"],["Muddat","15.07.2026 – 14.07.2029"],["Ssuda hisobraqami","15521000205681582941"]],
+    pays: sched.slice(0,3).map(s=>({id:uid(), amount:r2(s.prin+s.int), acc:null, date:s.date, pre:true}))});
+  D.seeds.push(SEED_ID);
+  save(); render();
+}
+
 async function load(){
   if (!ALLOWED) return showLock();
   try { const s=localStorage.getItem(LS); D = normalize(s?JSON.parse(s):{}); } catch(e){ D = normalize({}); }
   render();
-  if (!CS) return;
+  if (!CS) return seedLoans();
   try {
     const n = parseInt((await csGet([KP+"n"]))[KP+"n"]||"0");
-    if (!n) return;
+    if (!n) return seedLoans();
     const keys = Array.from({length:n},(_,i)=>KP+i);
     const parts = await csGet(keys);
     D = normalize(JSON.parse(keys.map(k=>parts[k]||"").join("")));
     try { localStorage.setItem(LS, JSON.stringify(D)); } catch(e){}
     render();
+    seedLoans();
   } catch(e){}
 }
 let saving = Promise.resolve();
@@ -396,7 +433,7 @@ function pLoan(){
     ${all.length ? all.sort((a,b)=>(b.i.rem>0)-(a.i.rem>0) || a.i.left-b.i.left).map(y=>`
       <div class="item" data-act="loanOpen" data-id="${y.l.id}">
         <div class="ico">🏦</div>
-        <div class="mid"><div>${esc(y.l.name)}</div><small>Oyiga ${money(y.l.monthly,y.l.cur)} · har oy ${y.l.day}-sanada${y.i.rem>0?` · ${y.i.monthsLeft} oy qoldi`:""}</small>${loanBadge(y.i)}
+        <div class="mid"><div>${esc(y.l.name)}</div><small>${y.l.sched?`Grafik bo'yicha${y.i.rem>0?` · keyingisi ${money(y.i.nextAmt,y.l.cur)}`:""}`:`Oyiga ${money(y.l.monthly,y.l.cur)} · har oy ${y.l.day}-sanada`}${y.i.rem>0?` · ${y.i.monthsLeft} oy qoldi`:""}</small>${loanBadge(y.i)}
           <div class="progress"><div style="width:${y.l.total?Math.min(100,y.i.paid/y.l.total*100):0}%"></div></div></div>
         <div class="amt">${money(y.i.rem,y.l.cur)}<small>qoldi</small></div>
       </div>`).join("") : `<div class="empty">Kredit qo'shilmagan</div>`}
@@ -606,12 +643,14 @@ function loanSheet(id){
         <div class="line"><span>Jami qarz</span><b>${money(l.total,l.cur)}</b></div>
         <div class="line"><span>To'langan</span><b class="green">${money(i.paid,l.cur)}</b></div>
         <div class="line"><span>Qolgan</span><b class="red">${money(i.rem,l.cur)}</b></div>
-        <div class="line"><span>Oylik to'lov</span><b>${money(l.monthly,l.cur)} · ${l.day}-sana</b></div>
-        ${i.rem>0?`<div class="line"><span>Keyingi to'lov</span><b>${fd(i.due)}</b></div><div class="line"><span>Qolgan oylar</span><b>~${i.monthsLeft} oy</b></div>`:""}
+        ${l.sched?"":`<div class="line"><span>Oylik to'lov</span><b>${money(l.monthly,l.cur)} · ${l.day}-sana</b></div>`}
+        ${i.rem>0?`<div class="line"><span>Keyingi to'lov</span><b>${fd(i.due)}${l.sched?` · ${money(i.nextAmt,l.cur)}`:""}</b></div><div class="line"><span>Qolgan oylar</span><b>${l.sched?"":"~"}${i.monthsLeft} oy</b></div>`:""}
+        ${l.info?l.info.map(([k,v])=>`<div class="line"><span>${esc(k)}</span><b>${esc(v)}</b></div>`).join(""):""}
       </div>
-      ${l.pays.length?`<h4>To'lovlar</h4><div class="box">${l.pays.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(p=>`<div class="line"><span>${fd(p.date)} · ${esc(accName(p.acc))}</span><span><b>${money(p.amount,l.cur)}</b><button class="x" data-pdel="${p.id}">×</button></span></div>`).join("")}</div>`:""}
+      ${l.sched?`<h4>To'lov grafigi</h4><div class="box">${i.rows.map(r=>`<div class="line"><span>${r.n}. ${fd(r.date)}<br><small class="lbl">${r.prin?`asosiy ${fmt(r.prin)} · `:""}foiz ${fmt(r.int)}</small></span><span style="text-align:right"><b class="${r.done?"green":""}">${money(r.amt,l.cur)}</b><br>${r.done?`<span class="bdg ok">To'langan</span>`:r.got>0?`<span class="bdg warn">${money(r.left,l.cur)} qoldi</span>`:dueBadge(r.left, dnum(r.date)-dnum(today()))}</span></div>`).join("")}</div>`:""}
+      ${l.pays.length?`<h4>To'lovlar</h4><div class="box">${l.pays.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(p=>`<div class="line"><span>${fd(p.date)} · ${p.pre?"oldin to'langan":esc(accName(p.acc))}</span><span><b>${money(p.amount,l.cur)}</b><button class="x" data-pdel="${p.id}">×</button></span></div>`).join("")}</div>`:""}
       ${i.rem>0?`<h4>To'lov qilish</h4>
-        ${numIn("pAmt", Math.min(l.monthly, i.rem))}
+        ${numIn("pAmt", l.sched ? i.nextAmt : Math.min(l.monthly, i.rem))}
         ${field("Qaysi hisobdan", accChips("pacc", firstAcc(l.cur), l.cur))}
         ${field("Sana", dateIn("pDate"))}
         <div class="actions"><button class="save" id="payBtn">To'lovni saqlash</button></div>`:""}
@@ -619,10 +658,10 @@ function loanSheet(id){
   }
   openSheet(`<h2>${l?esc(l.name):"Yangi kredit / bo'lib to'lash"}</h2>${top}
     ${field("Nomi", textIn("lName", l?l.name:"", "masalan: Telefon (Uzum Nasiya)"))}
-    ${field("Valyuta", chips("cur", [["UZS","So'm"],["USD","Dollar"]], l?l.cur:"UZS"))}
+    ${l&&l.sched?"":`${field("Valyuta", chips("cur", [["UZS","So'm"],["USD","Dollar"]], l?l.cur:"UZS"))}
     ${field("Jami to'lanadigan summa (foizi bilan)", numIn("lTotal", l&&l.total))}
     ${field("Oylik to'lov", numIn("lMonthly", l&&l.monthly))}
-    ${field("Har oyning nechanchi sanasida to'lanadi", `<input id="lDay" inputmode="numeric" value="${l?l.day:""}" placeholder="masalan: 10">`)}
+    ${field("Har oyning nechanchi sanasida to'lanadi", `<input id="lDay" inputmode="numeric" value="${l?l.day:""}" placeholder="masalan: 10">`)}`}
     ${l?"":field("Oldin to'lab bo'lingan summa (bo'lsa)", numIn("lPaid"))}
     ${actions(!!l)}`);
   if (l) {
@@ -635,6 +674,7 @@ function loanSheet(id){
   }
   bind(()=>{
     const name=$("lName").value.trim(); if(!name) return bad("lName");
+    if (l && l.sched) { l.name = name; return done(); }
     const total=num("lTotal"); if(!total) return bad("lTotal");
     const monthly=num("lMonthly"); if(!monthly) return bad("lMonthly");
     const day=Math.min(31,Math.max(1,num("lDay")||1));

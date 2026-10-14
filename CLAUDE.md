@@ -48,7 +48,9 @@ close sheet → previous tab (any nav tab other than Asosiy goes back to Asosiy)
 `shaxsiy/index.html` → https://mirfayozov21.github.io/shaxsiy/ — separate Telegram bot, same single-file style.
 Tabs: Asosiy (accounts in UZS/USD, net worth via `D.rate`), Kirim-chiqim (`kind:"inc"|"exp"|"tr"`; `tr` between
 different currencies stores `amountTo` and updates `D.rate`), Qarzlar (`D.debts` `{dir:"gave"|"took", cur, amount, acc?, due, pays}`),
-Kredit (`D.loans` `{total, monthly, day, cur, pays}`; pays with `pre:true` = paid before tracking, no account).
+Kredit (`D.loans` `{total, monthly, day, cur, pays}`; pays with `pre:true` = paid before tracking, no account;
+optional `sched:[{date, prin, int}]` = bank schedule with different amounts/dates, see `schedInfo()`; one-time seeded loans are
+recorded in `D.seeds` so they are never re-added after the user deletes them).
 `D = {accs, ops, debts, loans, rate}`; storage keys are separate from the shop app: localStorage `shaxsiy_v1`,
 CloudStorage `p0..pN` + `pn`. Do not share code paths/keys between the two apps.
 
