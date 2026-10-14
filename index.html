@@ -183,7 +183,7 @@ function balances(){
     if (o.kind==="exp") b[o.acc]-=o.amount;
     if (o.kind==="tr") { b[o.acc]-=o.amount; b[o.to]+=o.amount; }
   });
-  D.sups.forEach(s=>s.pays.forEach(p=>b[p.acc]-=p.amount));
+  D.sups.forEach(s=>s.pays.forEach(p=>{ if (!p.op) b[p.acc]-=p.amount; }));
   D.cust.forEach(c=>{ if (c.type==="pay") b[c.acc]+=c.amount; });
   return b;
 }
@@ -224,6 +224,21 @@ function ensureVendor(name, days, r){
   let v = findVendor(name, r);
   if (!v) { v = {id:uid(), name:String(name).trim(), phone:"", days: days||15}; r.vendors.push(v); }
   return v;
+}
+const SUPCAT = "Postavshikka";
+const vendorDebt = name => sum(D.sups.filter(x=>vkey(x.sup)===vkey(name)), x=>supInfo(x).rem);
+/* Postavshikka to'lov: qarzdan eng eski muddatli yukdan boshlab ayiriladi */
+function applyPay(op, targetId){
+  let left = op.amount;
+  const list = D.sups.filter(x=>vkey(x.sup)===vkey(op.vendor)).map(x=>({s:x,i:supInfo(x)})).filter(x=>x.i.rem>0)
+    .sort((a,b)=>((b.s.id===targetId)-(a.s.id===targetId)) || a.i.due.localeCompare(b.i.due) || a.s.date.localeCompare(b.s.date));
+  for (const x of list) { if (left<=0) break; const a=Math.min(left, x.i.rem); x.s.pays.push({id:uid(), amount:a, acc:op.acc, date:op.date, op:op.id}); left-=a; }
+  return left;
+}
+function unapplyPay(opId){ D.sups.forEach(x=>x.pays = x.pays.filter(p=>p.op!==opId)); }
+function vendorPay(vendor, amount, acc, date, note, targetId){
+  const op = {id:uid(), kind:"exp", cat:SUPCAT, vendor, amount, acc, date, note:note||""};
+  D.ops.push(op); applyPay(op, targetId); return op;
 }
 function vendorStats(){
   const m = {};
@@ -277,7 +292,8 @@ function pHome(){
   const b = balances();
   const mk = monthKey(new Date());
   const mSale = sum(D.ops.filter(o=>o.kind==="sale"&&o.date.startsWith(mk)), saleTotal);
-  const mExp = sum(D.ops.filter(o=>o.kind==="exp"&&o.date.startsWith(mk)), o=>o.amount);
+  const mExp = sum(D.ops.filter(o=>o.kind==="exp"&&o.cat!==SUPCAT&&o.date.startsWith(mk)), o=>o.amount);
+  const mSupPaid = sum(D.ops.filter(o=>o.kind==="exp"&&o.cat===SUPCAT&&o.date.startsWith(mk)), o=>o.amount);
   const open = D.sups.map(s=>({s,i:supInfo(s)})).filter(x=>x.i.rem>0);
   const warn = open.filter(x=>x.i.left<=3).sort((a,c)=>a.i.left-c.i.left);
   const custDebt = sum(custList(), c=>Math.max(0,c.bal));
@@ -316,6 +332,7 @@ function pHome(){
     <div class="line"><span>Savdo</span><b class="green">${fmt(mSale)}</b></div>
     <div class="line"><span>Rasxod</span><b class="red">${fmt(mExp)}</b></div>
     <div class="line"><span>Farq</span><b>${sm(mSale-mExp)}</b></div>
+    <div class="line"><span>Postavshiklarga to'landi</span><b>${fmt(mSupPaid)}</b></div>
   </div>`;
 }
 
@@ -343,7 +360,8 @@ function pSale(){
 function pExp(){
   const mk = monthKey(cur);
   const list = D.ops.filter(o=>(o.kind==="exp"||o.kind==="tr")&&o.date.startsWith(mk)).sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id);
-  const exps = list.filter(o=>o.kind==="exp");
+  const exps = list.filter(o=>o.kind==="exp"&&o.cat!==SUPCAT);
+  const supPaid = sum(list.filter(o=>o.kind==="exp"&&o.cat===SUPCAT), o=>o.amount);
   const total = sum(exps,o=>o.amount);
   const byCat = {}; exps.forEach(o=>byCat[o.cat]=(byCat[o.cat]||0)+o.amount);
   const cats = Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
@@ -352,13 +370,14 @@ function pExp(){
   <div class="card">
     <div class="lbl">Oy rasxodi</div>
     <div class="big red">${fmt(total)} so'm</div>
+    ${supPaid?`<div class="mini" style="margin-bottom:12px"><small>🚚 Postavshiklarga to'landi (rasxodga kirmaydi)</small><b>${fmt(supPaid)} so'm</b></div>`:""}
     ${cats.map(([c,v])=>`<div class="bar"><div class="top"><span>${esc(c)}</span><span>${fmt(v)} · ${Math.round(v/total*100)}%</span></div><div class="track"><div class="fill" style="width:${v/total*100}%"></div></div></div>`).join("")}
   </div>
   <div class="card">
     ${list.length ? list.map(o=> o.kind==="exp" ? `
       <div class="item" data-act="expEdit" data-id="${o.id}">
-        <div class="ico">💸</div>
-        <div class="mid"><div>${esc(o.cat)}</div><small>${fd(o.date)} · ${ACC[o.acc]}${o.note?" · "+esc(o.note):""}</small></div>
+        <div class="ico">${o.cat===SUPCAT?"🚚":"💸"}</div>
+        <div class="mid"><div>${o.cat===SUPCAT?"Postavshikka: "+esc(o.vendor):esc(o.cat)}</div><small>${fd(o.date)} · ${ACC[o.acc]}${o.note?" · "+esc(o.note):""}</small></div>
         <div class="amt red">−${fmt(o.amount)}</div>
       </div>` : `
       <div class="item" data-act="trEdit" data-id="${o.id}">
@@ -474,17 +493,50 @@ function expSheet(id){
   const o = id ? D.ops.find(x=>x.id===id) : null;
   openSheet(`<h2>${o?"Rasxodni tahrirlash":"Yangi rasxod"}</h2>
     ${field("Summa", numIn("fAmt", o&&o.amount))}
-    ${field("Turi", chips("cat", EXP_CATS.map(c=>[c,c]), o?o.cat:"Boshqa"))}
+    ${field("Turi", chips("cat", [[SUPCAT,"🚚 Postavshikka"]].concat(EXP_CATS.map(c=>[c,c])), o?o.cat:"Boshqa"))}
+    <div id="expVendBox" style="display:none">
+      <label>Qaysi postavshikka</label>
+      <input id="evQ" placeholder="qidirish" autocomplete="off">
+      <div class="vchips" id="evChips"></div>
+      <div class="lbl" id="evInfo" style="margin-top:6px"></div>
+    </div>
     ${field("Qayerdan to'landi", accChips("acc", o?o.acc:"naqd"))}
     ${field("Sana", dateIn("fDate", o&&o.date))}
     ${field("Izoh", textIn("fNote", o?o.note:"", "masalan: elektr uchun"))}
     ${actions(!!o)}`);
+  F.vendor = o && o.cat===SUPCAT ? o.vendor : "";
+  const own = name => (o && o.cat===SUPCAT && vkey(o.vendor)===vkey(name)) ? o.amount : 0;
+  const drawV = () => {
+    const q = vkey($("evQ").value);
+    const vs = D.vendors.map(v=>({v, d:vendorDebt(v.name)+own(v.name)}))
+      .filter(x=>(!q || vkey(x.v.name).includes(q)) && (x.d>0 || vkey(x.v.name)===vkey(F.vendor)))
+      .sort((a,b)=>b.d-a.d);
+    $("evChips").innerHTML = vs.map(x=>`<button type="button" data-ev="${esc(x.v.name)}" class="${vkey(x.v.name)===vkey(F.vendor)?"on":""}">${esc(x.v.name)} · ${fmt(x.d)}</button>`).join("")
+      || `<span class="lbl">Qarzimiz bor postavshik topilmadi</span>`;
+    $("evChips").querySelectorAll("[data-ev]").forEach(b=>b.onclick=()=>{
+      F.vendor = b.dataset.ev; const d = vendorDebt(F.vendor)+own(F.vendor);
+      if (!num("fAmt")) $("fAmt").value = fmt(d);
+      drawV();
+    });
+    $("evInfo").textContent = F.vendor ? `Qarzimiz: ${fmt(vendorDebt(F.vendor)+own(F.vendor))} so'm. To'lov shu qarzdan ayiriladi.` : "";
+  };
+  const toggleV = () => { const on = F.cat===SUPCAT; $("expVendBox").style.display = on?"block":"none"; if (on) drawV(); };
+  $("evQ").addEventListener("input", drawV);
+  F.onChip = (n)=>{ if (n==="cat") toggleV(); };
+  toggleV();
   bind(()=>{
     const amount = num("fAmt"); if (!amount) return bad("fAmt");
     const r = {amount, cat:F.cat, acc:F.acc, date:$("fDate").value||today(), note:$("fNote").value.trim()};
-    if (o) Object.assign(o,r); else D.ops.push({id:uid(), kind:"exp", ...r});
+    if (r.cat===SUPCAT) {
+      if (!F.vendor) { alertMsg("Postavshikni tanlang"); return; }
+      const debt = vendorDebt(F.vendor) + own(F.vendor);
+      if (amount > debt) { alertMsg(`${F.vendor}: qarzimiz ${fmt(debt)} so'm. Summa qarzdan ko'p bo'lmasligi kerak.`); return bad("fAmt"); }
+      r.vendor = findVendor(F.vendor) ? findVendor(F.vendor).name : F.vendor;
+    } else r.vendor = undefined;
+    if (o) { unapplyPay(o.id); Object.assign(o, r); if (o.cat===SUPCAT) applyPay(o); }
+    else { const op = {id:uid(), kind:"exp", ...r}; D.ops.push(op); if (op.cat===SUPCAT) applyPay(op); }
     done();
-  }, o && (()=>{ D.ops=D.ops.filter(x=>x!==o); }));
+  }, o && (()=>{ unapplyPay(o.id); D.ops=D.ops.filter(x=>x!==o); }));
 }
 
 /* --- O'tkazma --- */
@@ -572,8 +624,9 @@ function supNewSheet(pre){
       }
     }
     ensureVendor(sup, num("fDays"));
-    D.sups.push({id:uid(), sup:findVendor(sup).name, amount, date, days:num("fDays"), note:$("fNote").value.trim(), photos,
-      pays: paid ? [{id:uid(), amount:paid, acc:F.acc, date}] : []});
+    const nid = uid(), vname = findVendor(sup).name;
+    D.sups.push({id:nid, sup:vname, amount, date, days:num("fDays"), note:$("fNote").value.trim(), photos, pays:[]});
+    if (paid) vendorPay(vname, paid, F.acc, date, "", nid);
     pend.forEach(x=>URL.revokeObjectURL(x.url));
     done();
   });
@@ -622,19 +675,30 @@ function supSheet(id){
   $("sheet").querySelectorAll("[data-rmph]").forEach(b=>b.onclick=e=>{ e.stopPropagation(); ask("Rasmni o'chirasizmi?",()=>{ s.photos.splice(+b.dataset.rmph,1); done(true); supSheet(s.id); }); });
   if ($("payBtn")) $("payBtn").onclick = ()=>{
     const a = num("pAmt"); if (!a) return bad("pAmt");
-    s.pays.push({id:uid(), amount:a, acc:F.acc, date:$("pDate").value||today()});
+    const d = vendorDebt(s.sup);
+    if (a > d) { alertMsg(`${s.sup}: umumiy qarzimiz ${fmt(d)} so'm. Summa undan ko'p bo'lmasligi kerak.`); return bad("pAmt"); }
+    vendorPay(s.sup, a, F.acc, $("pDate").value||today(), "", s.id);
     done(true); supSheet(s.id);
   };
-  $("sheet").querySelectorAll("[data-payDel]").forEach(b=>b.onclick=()=>ask("To'lovni o'chirasizmi?",()=>{
-    s.pays = s.pays.filter(p=>p.id!==+b.dataset.paydel); done(true); supSheet(s.id);
-  }));
+  $("sheet").querySelectorAll("[data-payDel]").forEach(b=>{
+    const p = s.pays.find(x=>x.id===+b.dataset.paydel);
+    b.onclick=()=>ask(p.op ? "Bu to'lov rasxodlardan ham butunlay o'chiriladi. Davom etasizmi?" : "To'lovni o'chirasizmi?",()=>{
+      if (p.op) { unapplyPay(p.op); D.ops = D.ops.filter(o=>o.id!==p.op); }
+      else s.pays = s.pays.filter(x=>x!==p);
+      done(true); supSheet(s.id);
+    });
+  });
   bind(()=>{
     const sup=$("fSup").value.trim(); if(!sup) return bad("fSup");
     const amount=num("fAmt"); if(!amount) return bad("fAmt");
     ensureVendor(sup, num("fDays"));
     Object.assign(s,{sup:findVendor(sup).name, amount, date:$("fDate").value||s.date, days:num("fDays"), note:$("fNote").value.trim()});
     done();
-  }, ()=>{ D.sups=D.sups.filter(x=>x!==s); });
+  }, ()=>{
+    const ops = [...new Set(s.pays.filter(p=>p.op).map(p=>p.op))];
+    D.sups = D.sups.filter(x=>x!==s);
+    ops.forEach(id=>{ const op=D.ops.find(o=>o.id===id); if(!op) return; unapplyPay(id); applyPay(op); });
+  });
 }
 
 /* --- Postavshik (ro'yxat) --- */
@@ -666,6 +730,7 @@ function vendSheet(id){
     if (v) {
       const old = vkey(v.name);
       D.sups.forEach(x=>{ if (vkey(x.sup)===old) x.sup = name; });
+      D.ops.forEach(o=>{ if (o.vendor && vkey(o.vendor)===old) o.vendor = name; });
       Object.assign(v, {name, phone, days});
     } else D.vendors.push({id:uid(), name, phone, days});
     done();
