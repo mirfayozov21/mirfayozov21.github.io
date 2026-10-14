@@ -119,6 +119,9 @@ if (tg) { tg.ready(); tg.expand(); }
 /* ================= Sozlamalar ================= */
 const ACC = {naqd:"💵 Naqd", humo:"💳 Humo terminal", uzcard:"💳 Uzcard terminal", karta:"💳 Karta", bank:"🏦 Bank hisobi"};
 const ACCS = Object.keys(ACC);
+const SMENA = {1:"1-kassa · 08:00–18:00", 2:"2-kassa · 18:00–23:00"};
+const smenaShort = n => n ? `${n}-kassa` : "Kun bo'yi";
+const nowSmena = () => new Date().getHours() < 18 ? "1" : "2";
 const EXP_CATS = ["Ijara","Oylik","Kommunal","Transport","Soliq","Xo'jalik","Ovqat","Boshqa"];
 const MONTHS = ["Yanvar","Fevral","Mart","Aprel","May","Iyun","Iyul","Avgust","Sentabr","Oktabr","Noyabr","Dekabr"];
 
@@ -303,6 +306,7 @@ function pHome(){
     <div class="lbl">Bugungi savdo · ${fd(t)}</div>
     <div class="big">${fmt(sum(ACCS,k=>day[k]))} so'm</div>
     <div class="grid">${ACCS.map(k=>`<div class="mini"><small>${ACC[k]}</small><b>${fmt(day[k])}</b></div>`).join("")}</div>
+    <div class="row2" style="margin-top:8px">${[1,2].map(n=>{ const xs=ts.filter(o=>+o.smena===n); return `<div class="mini" style="flex:1" data-act="${xs.length?"saleEdit":"saleNew"}" data-id="${xs.length?xs[0].id:""}" data-sm="${n}"><small>${SMENA[n]}</small><b class="${xs.length?"green":""}">${xs.length?fmt(sum(xs,saleTotal)):"Yopilmagan"}</b></div>`; }).join("")}</div>
   </div>
 
   ${warn.length ? `<div class="card"><h3>⚠️ Postavshiklarga to'lov muddati</h3>${warn.map(x=>`
@@ -341,20 +345,22 @@ function pSale(){
   const list = D.ops.filter(o=>o.kind==="sale"&&o.date.startsWith(mk)).sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id);
   const tot = {}; ACCS.forEach(k=>tot[k]=sum(list,o=>o[k]||0));
   return `${monthBar()}
-  <button class="addbtn" data-act="saleNew">+ Kunlik savdoni kiritish</button>
+  <button class="addbtn" data-act="saleNew">+ Kassani yopish (savdo kiritish)</button>
   <div class="card">
     <div class="lbl">Oy bo'yicha savdo</div>
     <div class="big">${fmt(sum(ACCS,k=>tot[k]))} so'm</div>
     <div class="grid">${ACCS.map(k=>`<div class="mini"><small>${ACC[k]}</small><b>${fmt(tot[k])}</b></div>`).join("")}</div>
   </div>
-  <div class="card">
-    ${list.length ? list.map(o=>`
-      <div class="item" data-act="saleEdit" data-id="${o.id}">
-        <div class="ico">🛒</div>
-        <div class="mid"><div>${fd(o.date)}</div><small>${ACCS.filter(k=>o[k]).map(k=>ACC[k].split(" ")[1]+": "+fmt(o[k])).join(" · ")}${o.note?" · "+esc(o.note):""}</small></div>
-        <div class="amt green">${fmt(saleTotal(o))}</div>
-      </div>`).join("") : `<div class="empty">Bu oyda savdo kiritilmagan</div>`}
-  </div>`;
+  ${list.length ? [...new Set(list.map(o=>o.date))].map(d=>{
+      const xs = list.filter(o=>o.date===d).sort((a,b)=>(+a.smena||0)-(+b.smena||0)||a.id-b.id);
+      return `<div class="card">
+        <h3><span>${fd(d)}</span><span class="green">${fmt(sum(xs,saleTotal))} so'm</span></h3>
+        ${xs.map(o=>`<div class="item" data-act="saleEdit" data-id="${o.id}">
+          <div class="ico">${o.smena?(+o.smena===1?"☀️":"🌙"):"🛒"}</div>
+          <div class="mid"><div>${smenaShort(+o.smena)}</div><small>${ACCS.filter(k=>o[k]).map(k=>ACC[k].split(" ")[1]+": "+fmt(o[k])).join(" · ")}${o.note?" · "+esc(o.note):""}</small></div>
+          <div class="amt">${fmt(saleTotal(o))}</div>
+        </div>`).join("")}
+      </div>`; }).join("") : `<div class="card"><div class="empty">Bu oyda savdo kiritilmagan</div></div>`}`;
 }
 
 function pExp(){
@@ -472,15 +478,21 @@ function bad(id){ haptic("error"); const el=$(id); if(el){ el.focus(); el.style.
 function done(keepOpen){ haptic("success"); if(!keepOpen) closeSheet(); save(); render(); }
 
 /* --- Savdo --- */
-function saleSheet(id){
+function saleSheet(id, sm){
   const o = id ? D.ops.find(x=>x.id===id) : null;
-  openSheet(`<h2>${o?"Savdoni tahrirlash":"Kunlik savdo"}</h2>
+  openSheet(`<h2>${o?"Savdoni tahrirlash":"Kassani yopish"}</h2>
+    ${field("Kassa", chips("smena", [["1","☀️ "+SMENA[1]],["2","🌙 "+SMENA[2]]], o ? String(o.smena||"") : String(sm||nowSmena())))}
+    <div class="lbl" id="smWarn" style="margin-top:6px;color:var(--orange)"></div>
     ${field("Sana", dateIn("fDate", o&&o.date))}
     ${ACCS.map(k=>field(ACC[k], numIn("f_"+k, o&&o[k]))).join("")}
     ${field("Izoh", textIn("fNote", o?o.note:"", "ixtiyoriy"))}
     ${actions(!!o)}`);
+  const dup = () => D.ops.find(x=>x.kind==="sale" && x!==o && x.date===($("fDate").value||today()) && String(x.smena||"")===String(F.smena||""));
+  const warn = () => { const d=dup(); $("smWarn").textContent = d ? `Bu kassa shu kuni allaqachon kiritilgan (${fmt(saleTotal(d))} so'm). Saqlasangiz, ustiga qo'shiladi.` : ""; };
+  F.onChip = n => { if (n==="smena") warn(); };
+  $("fDate").addEventListener("change", warn); warn();
   bind(()=>{
-    const r = {date:$("fDate").value||today(), note:$("fNote").value.trim()};
+    const r = {date:$("fDate").value||today(), note:$("fNote").value.trim(), smena: F.smena ? +F.smena : undefined};
     ACCS.forEach(k=>r[k]=num("f_"+k));
     if (!saleTotal(r)) return bad("f_naqd");
     if (o) Object.assign(o,r); else D.ops.push({id:uid(), kind:"sale", ...r});
@@ -786,7 +798,7 @@ document.addEventListener("click", e=>{
   const a = el.dataset.act, id = +el.dataset.id;
   if (a==="tab") { tab = el.dataset.t; window.scrollTo(0,0); render(); }
   else if (a==="mnav") { cur.setMonth(cur.getMonth() + +el.dataset.d); render(); }
-  else if (a==="saleNew") saleSheet();
+  else if (a==="saleNew") saleSheet(null, el.dataset.sm);
   else if (a==="saleEdit") saleSheet(id);
   else if (a==="expNew") expSheet();
   else if (a==="expEdit") expSheet(id);

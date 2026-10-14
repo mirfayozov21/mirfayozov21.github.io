@@ -9,7 +9,8 @@ Opened from the owner's Telegram bot via BotFather → Menu Button → that URL.
 
 ## Features (bottom nav tabs)
 - **Asosiy** — today's sales by payment method, account balances, supplier payment warnings, debts, month summary.
-- **Savdo** — daily sales split into accounts: naqd, humo, uzcard, karta, bank.
+- **Savdo** — sales per cash shift (`smena`: 1 = 08:00–18:00, 2 = 18:00–23:00; old entries have none) split into accounts:
+  naqd, humo, uzcard, karta, bank. Day/month totals sum both shifts.
 - **Rasxod** — expenses by category and source account; transfers between accounts (`kind:"tr"`).
   Category `Postavshikka` = payment to a supplier: it is applied to that supplier's unpaid deliveries
   (oldest due date first) and is NOT counted as an operating expense.
@@ -19,7 +20,7 @@ Opened from the owner's Telegram bot via BotFather → Menu Button → that URL.
 
 ## Data
 One object `D = {ops, sups, cust, start, vendors}`:
-- `ops`: `{kind:"sale", date, naqd, humo, uzcard, karta, bank}`, `{kind:"exp", cat, acc, amount, vendor?}`, `{kind:"tr", acc, to, amount}`
+- `ops`: `{kind:"sale", date, smena?, naqd, humo, uzcard, karta, bank}`, `{kind:"exp", cat, acc, amount, vendor?}`, `{kind:"tr", acc, to, amount}`
 - `sups`: deliveries `{sup, amount, date, days, photos:[path], pays:[{amount, acc, date, op?}]}`.
   A pay with `op` belongs to an expense op (counted once, via the op, in `balances()`).
 - `vendors`: `{name, phone, days}`; `cust`: `{name, type, amount, acc?, date}`; `start`: opening balances per account.
