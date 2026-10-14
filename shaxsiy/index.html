@@ -262,7 +262,22 @@ function seedAvo(){
   D.seeds.push(AVO_SEED);
   return true;
 }
+/* Bir martalik: TBC Bank krediti (annuitet, 36 oy, 15-sanada; 2026-09-15 gacha 10 ta to'lov qilingan).
+   Oylik to'lov va qolgan jami bank ilovasidan; asosiy/foiz bo'linishi annuitet bo'yicha hisoblangan (taxminiy). */
+const TBC_SEED = "tbc-bank-2026";
+const TBC = `2025-12-15|449615.57|979064.77,2026-01-15|464289.0|964391.34,2026-02-15|479441.3|949239.04,2026-03-15|495088.1|933592.24,2026-04-15|511245.54|917434.8,2026-05-15|527930.29|900750.05,2026-06-15|545159.56|883520.78,2026-07-15|562951.11|865729.23,2026-08-15|581323.29|847357.05,2026-09-15|600295.07|828385.27,2026-10-15|619885.99|808794.35,2026-11-15|640116.28|788564.06,2026-12-15|661006.79|767673.55,2027-01-15|682579.07|746101.27,2027-02-15|704855.37|723824.97,2027-03-15|727858.67|700821.67,2027-04-15|751612.7|677067.64,2027-05-15|776141.95|652538.39,2027-06-15|801471.73|627208.61,2027-07-15|827628.15|601052.19,2027-08-15|854638.2|574042.14,2027-09-15|882529.74|546150.6,2027-10-15|911331.53|517348.81,2027-11-15|941073.29|487607.05,2027-12-15|971785.68|456894.66,2028-01-15|1003500.38|425179.96,2028-02-15|1036250.11|392430.23,2028-03-15|1070068.64|358611.7,2028-04-15|1104990.86|323689.48,2028-05-15|1141052.78|287627.56,2028-06-15|1178291.6|250388.74,2028-07-15|1216745.73|211934.61,2028-08-15|1256454.82|172225.52,2028-09-15|1297459.84|131220.5,2028-10-15|1339803.08|88877.26,2028-11-15|1383528.19|45151.69`;
+function seedTbc(){
+  if (D.seeds.includes(TBC_SEED)) return false;
+  const sched = TBC.split(",").map(x=>{ const [date,p,i]=x.split("|"); return {date, prin:+p, int:+i}; });
+  const total = r2(sum(sched,s=>s.prin+s.int));
+  D.loans.push({id:uid(), name:"TBC Bank krediti", cur:"UZS", total, monthly:0, day:15, start:"2025-11-15", sched,
+    info:[["Kredit summasi","30 000 000 so'm"],["Foiz","39% (yillik)"],["Oylik to'lov","1 428 680,34 so'm"],["Muddat","36 oy · 15.11.2028 gacha"],["Izoh","Asosiy qarz/foiz bo'linishi taxminiy"]],
+    pays: sched.filter(s=>s.date<="2026-09-15").map(s=>({id:uid(), amount:r2(s.prin+s.int), acc:null, date:s.date, pre:true}))});
+  D.seeds.push(TBC_SEED);
+  return true;
+}
 function seedLoans(){
+  if (seedTbc()) { save(); render(); }
   if (seedAvo()) { save(); render(); }
   if (seedAgro()) { save(); render(); }
   if (D.seeds.includes(SEED_ID)) return;
