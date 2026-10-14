@@ -138,7 +138,7 @@ const BUCKET = "nakladnoy";
 let SB = null;
 try { SB = window.supabase.createClient(SB_URL, SB_KEY, {auth:{persistSession:false}}); } catch(e){}
 
-let D = { ops:[], sups:[], cust:[], start:{}, vendors:[], staff:[], att:[], bonus:[] };
+let D = { ops:[], sups:[], cust:[], start:{}, vendors:[], staff:[], att:[], bonus:[], dayx:[] };
 let tab = "home", cur = new Date(), supFilter = "open", F = {};
 cur.setDate(1);
 
@@ -223,7 +223,7 @@ const csSet = (k,v) => new Promise(r => CS.setItem(k,v,()=>r()));
 const csDel = keys => new Promise(r => keys.length ? CS.removeItems(keys,()=>r()) : r());
 function normalize(d){
   const r = { ops:d.ops||[], sups:d.sups||[], cust:d.cust||[], start:d.start||{}, vendors:d.vendors||[],
-              staff:d.staff||[], att:d.att||[], bonus:d.bonus||[], staffInit:!!d.staffInit };
+              staff:d.staff||[], att:d.att||[], bonus:d.bonus||[], dayx:d.dayx||[], staffInit:!!d.staffInit, schedInit:!!d.schedInit };
   if (!r.staffInit) {
     const m = "2026-10";
     r.staff = [
@@ -233,6 +233,12 @@ function normalize(d){
       {id:uid(), name:"Faridun",  salary:3000000, payDay:15, hasBonus:false, start:"", phone:"", since:m, active:true}];
     r.staffInit = true;
   }
+  if (!r.schedInit) {
+    const S = {dilrabo:["08:00","18:00",0], hayotxon:["08:00","18:00",5], mirjalol:["15:00","23:00",0], faridun:["14:30","23:00",6]};
+    r.staff.forEach(st=>{ const x=S[vkey(st.name)]; if (x) { st.start=x[0]; st.end=x[1]; st.dayOff=x[2]; } if (!st.trackFrom) st.trackFrom=today(); });
+    r.schedInit = true;
+  }
+  r.staff.forEach(st=>{ if (!st.trackFrom) st.trackFrom = today(); });
   r.sups.slice().sort((a,b)=>a.date.localeCompare(b.date)).forEach(x=>ensureVendor(x.sup, x.days, r));
   return r;
 }
@@ -293,12 +299,31 @@ function salaryWarnings(){
 const hm = t => t ? (+t.slice(0,2))*60 + (+t.slice(3,5)) : null;
 const nowTime = () => { const d=new Date(); return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); };
 const fmtH = mins => `${Math.floor(mins/60)} soat${mins%60?` ${mins%60} daq`:""}`;
+const WD = ["Yakshanba","Dushanba","Seshanba","Chorshanba","Payshanba","Juma","Shanba"];
+const wday = s => new Date(Date.UTC(+s.slice(0,4), +s.slice(5,7)-1, +s.slice(8,10))).getUTCDay();
+const hasOff = st => st.dayOff!==undefined && st.dayOff!==null && st.dayOff!=="";
+const dayEx = (sid,d) => D.dayx.find(x=>x.staffId===sid && x.date===d);
+function plannedWork(st, d){ const ex = dayEx(st.id,d); if (ex) return ex.type==="work"; return !hasOff(st) || wday(d)!==+st.dayOff; }
+const isLate = (st,a) => st.start && a.in && hm(a.in) > hm(st.start);
+const isEarly = (st,a) => st.end && a.out && hm(a.out) < hm(st.end);
 function attStats(st, m){
-  const xs = D.att.filter(a=>a.staffId===st.id && a.date.startsWith(m));
-  let mins=0, late=0;
-  xs.forEach(a=>{ if (a.in && a.out) { let d=hm(a.out)-hm(a.in); if (d<0) d+=1440; mins+=d; } if (st.start && a.in && hm(a.in)>hm(st.start)) late++; });
-  return {days:xs.length, mins, late, list:xs.sort((a,b)=>a.date.localeCompare(b.date))};
+  const xs = D.att.filter(a=>a.staffId===st.id && a.date.startsWith(m)).sort((a,b)=>a.date.localeCompare(b.date));
+  let mins=0, late=0, early=0, offWork=0;
+  xs.forEach(a=>{ if (a.in && a.out) { let d=hm(a.out)-hm(a.in); if (d<0) d+=1440; mins+=d; }
+    if (isLate(st,a)) late++; if (isEarly(st,a)) early++; if (!plannedWork(st,a.date)) offWork++; });
+  // reja bo'yicha ish kunlari va kelmagan kunlar (kuzatuv boshlangan kundan bugungacha)
+  let planned=0; const absent=[];
+  const end = m+"-"+String(new Date(+m.slice(0,4), +m.slice(5,7), 0).getDate()).padStart(2,"0");
+  const from = st.trackFrom && st.trackFrom > m+"-01" ? st.trackFrom : m+"-01";
+  const to = end < today() ? end : today();
+  for (let d=from; d<=to; d=addDays(d,1)) {
+    if (!plannedWork(st,d)) continue;
+    planned++;
+    if (!xs.some(a=>a.date===d) && d<today()) absent.push(d);
+  }
+  return {days:xs.length, mins, late, early, offWork, planned, absent, list:xs};
 }
+const schedText = st => `${st.start&&st.end?`${st.start}–${st.end}`:"ish vaqti belgilanmagan"}${hasOff(st)?` · dam: ${WD[+st.dayOff].toLowerCase()}`:""}`;
 
 function vendorStats(){
   const m = {};
@@ -509,10 +534,10 @@ function pStaff(){
       const a = D.att.find(x=>x.staffId===st.id && x.date===t);
       const btn = !a ? `<button class="tbtn" data-act="attIn" data-id="${st.id}">Keldi</button>`
         : !a.out ? `<button class="tbtn out" data-act="attOut" data-id="${st.id}">Ketdi</button>` : "";
-      const late = a && st.start && hm(a.in)>hm(st.start);
+      const late = a && isLate(st,a), early = a && isEarly(st,a), work = plannedWork(st,t);
       return `<div class="att">
-        <div class="mid" data-act="attEdit" data-id="${st.id}" data-d="${t}"><div>${esc(st.name)}</div>
-          <small>${a ? `Keldi ${a.in}${late?` <span class="red">(kechikdi)</span>`:""}${a.out?` · Ketdi ${a.out}`:""}` : "Hali kelmadi"}</small></div>
+        <div class="mid" data-act="attEdit" data-id="${st.id}" data-d="${t}"><div>${esc(st.name)} ${work?"":`<span class="bdg">🌴 dam olish kuni</span>`}</div>
+          <small>${a ? `Keldi ${a.in}${late?` <span class="red">(kechikdi)</span>`:""}${a.out?` · Ketdi ${a.out}${early?` <span class="red">(erta)</span>`:""}`:""}` : (work?`Hali kelmadi · ${st.start||""}${st.end?"–"+st.end:""}`:"Bugun ishlamaydi")}</small></div>
         ${btn}</div>`; }).join("") : `<div class="empty">Xodim yo'q</div>`}
   </div>
 
@@ -530,7 +555,8 @@ function pStaff(){
   <div class="card">
     <h3><span>Davomat · ${MONTHS[cur.getMonth()]}${isCur?" (hozirgacha)":""}</span></h3>
     ${act.map(st=>{ const a=attStats(st,m); return `<div class="line" data-act="staffOpen" data-id="${st.id}" data-m="${m}">
-      <span>${esc(st.name)}</span><span style="text-align:right"><b>${a.days} kun</b> · ${fmtH(a.mins)}${st.start?` · <span class="${a.late?"red":""}">${a.late} marta kech</span>`:""}</span></div>`; }).join("")}
+      <span>${esc(st.name)}</span><span style="text-align:right;font-size:14px"><b>${a.days} kun</b> · ${fmtH(a.mins)}<br>
+      <small class="${a.absent.length?"red":"lbl"}">${a.absent.length} kelmadi</small> · <small class="${a.late?"red":"lbl"}">${a.late} kech</small> · <small class="${a.early?"red":"lbl"}">${a.early} erta</small></span></div>`; }).join("")}
   </div>
   <button class="addbtn ghost" style="background:var(--bg)" data-act="staffNew">+ Xodim qo'shish</button>`;
 }
@@ -870,12 +896,18 @@ function staffSheet(id, m){
     <div class="actions"><button class="save" id="giveBtn">💵 Pul berish (avans / oylik)</button></div>
     <h4>Davomat · ${mLabel(m)}</h4>
     <div class="box">
+      <div class="line"><span>Ish tartibi</span><b style="text-align:right">${schedText(st)}</b></div>
+      <div class="line"><span>Reja bo'yicha ish kunlari</span><b>${a.planned} kun</b></div>
       <div class="line"><span>Ishga kelgan kunlar</span><b>${a.days} kun</b></div>
+      <div class="line"><span>Kelmagan kunlar</span><b class="${a.absent.length?"red":""}">${a.absent.length}${a.absent.length?` (${a.absent.map(d=>+d.slice(8)).join(", ")})`:""}</b></div>
+      <div class="line"><span>Dam olish kunida ishlagan</span><b>${a.offWork} kun</b></div>
+      <div class="line"><span>Kechikkan</span><b class="${a.late?"red":""}">${a.late} marta</b></div>
+      <div class="line"><span>Erta ketgan</span><b class="${a.early?"red":""}">${a.early} marta</b></div>
       <div class="line"><span>Jami ishlagan</span><b>${fmtH(a.mins)}</b></div>
-      ${st.start?`<div class="line"><span>Kechikishlar (${st.start} dan keyin)</span><b class="${a.late?"red":""}">${a.late} marta</b></div>`:""}
-      ${a.list.map(x=>`<div class="line" data-act="attEdit" data-id="${st.id}" data-d="${x.date}"><span>${fd(x.date)}</span><span>${x.in||"—"} → ${x.out||"—"}${st.start&&x.in&&hm(x.in)>hm(st.start)?' <span class="red">kech</span>':""}</span></div>`).join("")}
+      ${a.list.map(x=>`<div class="line" data-act="attEdit" data-id="${st.id}" data-d="${x.date}"><span>${fd(x.date)}${plannedWork(st,x.date)?"":" 🌴"}</span><span>${x.in||"—"} → ${x.out||"—"}${isLate(st,x)?' <span class="red">kech</span>':""}${isEarly(st,x)?' <span class="red">erta</span>':""}</span></div>`).join("")}
     </div>
-    <div class="actions"><button class="cancel" id="attAddBtn">+ Kunni qo'lda kiritish</button></div>
+    <div class="row2"><button class="addbtn ghost" style="background:var(--bg2);margin:10px 0 0" id="attAddBtn">+ Kunni kiritish</button><button class="addbtn ghost" style="background:var(--bg2);margin:10px 0 0" id="exAddBtn">⇄ Dam olishni almashtirish</button></div>
+    ${D.dayx.some(x=>x.staffId===st.id&&x.date.startsWith(m))?`<h4>Istisnolar · ${mLabel(m)}</h4><div class="box">${D.dayx.filter(x=>x.staffId===st.id&&x.date.startsWith(m)).sort((p,q)=>p.date.localeCompare(q.date)).map(x=>`<div class="line"><span>${fd(x.date)} (${WD[wday(x.date)].toLowerCase()}) — ${x.type==="work"?"ishlaydi":"dam oladi"}</span><button class="x" data-exdel="${x.id}">×</button></div>`).join("")}</div>`:""}
     <h4>Xodim ma'lumotlari</h4>`;
   }
   openSheet(`<h2>${st?esc(st.name):"Yangi xodim"}</h2>${body}
@@ -883,19 +915,23 @@ function staffSheet(id, m){
     ${field("Oylik (so'm)", numIn("sSalary", st&&st.salary))}
     ${field("Oylik har oyning nechanchi sanasigacha beriladi", `<input id="sDay" inputmode="numeric" value="${st?st.payDay:5}">`)}
     ${field("Bonus oladimi", chips("hasBonus", [["1","Ha"],["0","Yo'q"]], st&&st.hasBonus?"1":"0"))}
-    ${field("Ishga kelish vaqti (kechikishni hisoblash uchun, ixtiyoriy)", `<input id="sStart" type="time" value="${st?st.start:""}">`)}
+    <div class="row2"><div style="flex:1">${field("Ish boshlanishi", `<input id="sStart" type="time" value="${st?st.start||"":""}">`)}</div>
+      <div style="flex:1">${field("Ish tugashi", `<input id="sEnd" type="time" value="${st?st.end||"":""}">`)}</div></div>
+    ${field("Dam olish kuni", chips("dayOff", [["","Yo'q"]].concat([1,2,3,4,5,6,0].map(i=>[String(i),WD[i].slice(0,2)])), st&&hasOff(st)?String(st.dayOff):""))}
     ${field("Telefon", `<input id="sPhone" type="tel" value="${esc(st?st.phone:"")}" placeholder="+998 ..">`)}
     ${actions(!!st)}`);
   if (st) {
     if ($("bonusIn")) $("bonusIn").addEventListener("change", ()=>{ setBonus(st.id, m, num("bonusIn")); save(); render(); staffSheet(st.id, m); });
     $("giveBtn").onclick = ()=>staffPaySheet(st.id, null, m);
     $("attAddBtn").onclick = ()=>attSheet(st.id, today());
+    $("exAddBtn").onclick = ()=>exSheet(st.id, m);
+    $("sheet").querySelectorAll("[data-exdel]").forEach(b=>b.onclick=e=>{ e.stopPropagation(); ask("Istisnoni o'chirasizmi?",()=>{ D.dayx=D.dayx.filter(x=>x.id!==+b.dataset.exdel); done(true); staffSheet(st.id,m); }); });
   }
   bind(()=>{
     const name = $("sName").value.trim(); if (!name) return bad("sName");
-    const r = {name, salary:num("sSalary"), payDay:Math.min(31,Math.max(1,num("sDay")||5)), hasBonus:F.hasBonus==="1", start:$("sStart").value, phone:$("sPhone").value.trim()};
+    const r = {name, salary:num("sSalary"), payDay:Math.min(31,Math.max(1,num("sDay")||5)), hasBonus:F.hasBonus==="1", start:$("sStart").value, end:$("sEnd").value, dayOff:F.dayOff===""?"":+F.dayOff, phone:$("sPhone").value.trim()};
     if (st) { Object.assign(st, r); if (st.hasBonus && $("bonusIn")) setBonus(st.id, m, num("bonusIn")); }
-    else D.staff.push({id:uid(), since:monthKey(new Date()), active:true, ...r});
+    else D.staff.push({id:uid(), since:monthKey(new Date()), trackFrom:today(), active:true, ...r});
     done();
   }, st && (()=>{ if (staffPays(st.id).length || D.att.some(a=>a.staffId===st.id)) st.active=false; else D.staff=D.staff.filter(x=>x!==st); }));
 }
@@ -931,6 +967,22 @@ function staffPaySheet(sid, opId, m){
     if (o) Object.assign(o, r); else D.ops.push({id:uid(), ...r});
     done(true); staffSheet(st.id, month);
   }, o && (()=>{ D.ops = D.ops.filter(x=>x!==o); }));
+}
+
+function exSheet(sid, m){
+  const st = D.staff.find(x=>x.id===sid); if (!st) return;
+  openSheet(`<h2>${esc(st.name)} — dam olishni almashtirish</h2>
+    <div class="lbl" style="margin-top:4px">Odatiy tartib: ${schedText(st)}. Ikkala sanani yoki faqat bittasini kiritishingiz mumkin.</div>
+    ${field("Dam olish kunida ishga chiqdi (sana)", `<input id="xWork" type="date">`)}
+    ${field("O'rniga dam oldi / ishga chiqmaydi (sana)", `<input id="xOff" type="date">`)}
+    ${field("Izoh", textIn("xNote","","ixtiyoriy"))}
+    ${actions(false)}`);
+  bind(()=>{
+    const w = $("xWork").value, o = $("xOff").value, note = $("xNote").value.trim();
+    if (!w && !o) return bad("xWork");
+    [[w,"work"],[o,"off"]].forEach(([d,type])=>{ if (!d) return; D.dayx = D.dayx.filter(x=>!(x.staffId===sid&&x.date===d)); D.dayx.push({id:uid(), staffId:sid, date:d, type, note}); });
+    done(true); staffSheet(sid, m);
+  });
 }
 
 function attSheet(sid, date){

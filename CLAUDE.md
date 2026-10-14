@@ -20,10 +20,12 @@ Opened from the owner's Telegram bot via BotFather → Menu Button → that URL.
 - **Xodimlar** — staff (`D.staff`: salary, payDay, hasBonus, start time, since, active), monthly bonus (`D.bonus`),
   salary/advance payments = expense ops `{cat:"Oylik", staffId, ptype:"avans"|"oylik", month:"YYYY-MM"}`
   (month = whose salary it is; salary of month M is due on payDay of M+1), attendance `D.att` `{staffId, date, in, out}`
-  with monthly totals (days, hours, late arrivals vs `start`).
+  with monthly totals. Schedule per staff: `start`, `end`, `dayOff` (0=Sunday..6), `trackFrom` (absences counted only from this date).
+  Day swaps/exceptions in `D.dayx` `{staffId, date, type:"work"|"off"}` override the weekly day off.
+  Stats: planned days, came, absent dates, worked on day off, late (in > start), early (out < end), hours.
 
 ## Data
-One object `D = {ops, sups, cust, start, vendors, staff, bonus, att}`:
+One object `D = {ops, sups, cust, start, vendors, staff, bonus, att, dayx}`:
 - `ops`: `{kind:"sale", date, smena?, naqd, humo, uzcard, karta, bank}`, `{kind:"exp", cat, acc, amount, vendor?}`, `{kind:"tr", acc, to, amount}`
 - `sups`: deliveries `{sup, amount, date, days, photos:[path], pays:[{amount, acc, date, op?}]}`.
   A pay with `op` belongs to an expense op (counted once, via the op, in `balances()`).
