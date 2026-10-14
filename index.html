@@ -124,6 +124,20 @@ label.photoBtn{display:block;text-align:center;padding:12px;border-radius:10px;b
 const tg = (window.Telegram && Telegram.WebApp) ? Telegram.WebApp : null;
 if (tg) { tg.ready(); tg.expand(); }
 
+/* ================= Qulf: faqat ruxsat berilgan Telegram akkauntlar ================= */
+const OWNER_IDS = [1243874281]; // egasi; xodim qo'shish uchun ID ni shu ro'yxatga yozing
+const ME = tg && tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : null;
+const ALLOWED = ME !== null && OWNER_IDS.includes(ME);
+function showLock(){
+  document.querySelector("nav").style.display = "none";
+  document.body.style.paddingBottom = "12px";
+  document.getElementById("page").innerHTML = `<div class="card" style="text-align:center;margin-top:30vh">
+    <div style="font-size:44px">🔒</div>
+    <div style="font-size:18px;font-weight:700;margin:8px 0">Ruxsat yo'q</div>
+    <div class="lbl">Bu ilova shaxsiy va faqat egasi uchun.${ME?`<br><br>Sizning Telegram ID: <b>${ME}</b>`:"<br><br>Ilovani Telegram bot orqali oching."}</div>
+  </div>`;
+}
+
 /* ================= Sozlamalar ================= */
 const ACC = {naqd:"💵 Naqd", humo:"💳 Humo terminal", uzcard:"💳 Uzcard terminal", karta:"💳 Karta", bank:"🏦 Bank hisobi"};
 const ACCS = Object.keys(ACC);
@@ -335,6 +349,7 @@ function vendorStats(){
 }
 
 async function load(){
+  if (!ALLOWED) return showLock();
   try { const s=localStorage.getItem(LS); D = normalize(s ? JSON.parse(s) : {}); } catch(e){ D = normalize({}); }
   render();
   if (!CS) return;

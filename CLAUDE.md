@@ -52,6 +52,11 @@ Kredit (`D.loans` `{total, monthly, day, cur, pays}`; pays with `pre:true` = pai
 `D = {accs, ops, debts, loans, rate}`; storage keys are separate from the shop app: localStorage `shaxsiy_v1`,
 CloudStorage `p0..pN` + `pn`. Do not share code paths/keys between the two apps.
 
+## Access lock (both apps)
+`OWNER_IDS` near the top of each `index.html` (owner Telegram ID 1243874281). Anyone else (or a plain browser) sees
+"Ruxsat yo'q" with their own ID. To give a staff member access, add their ID to `OWNER_IDS` in the shop app.
+For Playwright tests, stub `window.Telegram.WebApp.initDataUnsafe.user.id` with an allowed ID.
+
 ## Working on it
 - Test in headless Chromium (Playwright) with `telegram.org` and `cdn.jsdelivr.net` routed to stubs;
   supabase.co is not reachable from the sandbox, so mock `window.supabase`.
