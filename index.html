@@ -291,7 +291,7 @@ const csSet = (k,v) => new Promise(r => CS.setItem(k,v,()=>r()));
 const csDel = keys => new Promise(r => keys.length ? CS.removeItems(keys,()=>r()) : r());
 function normalize(d){
   const r = { ops:d.ops||[], sups:d.sups||[], cust:d.cust||[], start:d.start||{}, vendors:d.vendors||[],
-              staff:d.staff||[], att:d.att||[], bonus:d.bonus||[], dayx:d.dayx||[], staffInit:!!d.staffInit, schedInit:!!d.schedInit };
+              staff:d.staff||[], att:d.att||[], bonus:d.bonus||[], dayx:d.dayx||[], staffInit:!!d.staffInit, schedInit:!!d.schedInit, bossInit:!!d.bossInit };
   if (!r.staffInit) {
     const m = "2026-10";
     r.staff = [
@@ -305,6 +305,11 @@ function normalize(d){
     const S = {dilrabo:["08:00","18:00",0], hayotxon:["08:00","18:00",5], mirjalol:["15:00","23:00",0], faridun:["14:30","23:00",6]};
     r.staff.forEach(st=>{ const x=S[vkey(st.name)]; if (x) { st.start=x[0]; st.end=x[1]; st.dayOff=x[2]; } if (!st.trackFrom) st.trackFrom=today(); });
     r.schedInit = true;
+  }
+  /* rahbar (egasi) — bir marta qo'shiladi; davomati yuritilmaydi, kassadan olgan pullari ko'rinadi */
+  if (!r.bossInit) {
+    if (!r.staff.some(st=>vkey(st.name)==="xikmatillo")) r.staff.unshift({id:uid(), name:"Xikmatillo", role:"Rahbar", salary:0, payDay:5, hasBonus:false, start:"", end:"", phone:"", since:"2026-10", active:true, noAtt:true, trackFrom:today()});
+    r.bossInit = true;
   }
   r.staff.forEach(st=>{ if (!st.trackFrom) st.trackFrom = today(); });
   r.sups.slice().sort((a,b)=>a.date.localeCompare(b.date)).forEach(x=>ensureVendor(x.sup, x.days, r));
@@ -603,12 +608,12 @@ function pSup(){
 }
 
 function pStaff(){
-  const m = monthKey(cur), t = today(), act = D.staff.filter(st=>st.active!==false);
+  const m = monthKey(cur), t = today(), act = D.staff.filter(st=>st.active!==false), wk = act.filter(st=>!st.noAtt);
   const isCur = m===monthKey(new Date());
   return `${monthBar()}
   <div class="card">
     <h3><span>Bugungi davomat · ${fd(t)}</span></h3>
-    ${act.length ? act.map(st=>{
+    ${wk.length ? wk.map(st=>{
       const a = D.att.find(x=>x.staffId===st.id && x.date===t);
       const btn = !a ? `<button class="tbtn" data-act="attIn" data-id="${st.id}">Keldi</button>`
         : !a.out ? `<button class="tbtn out" data-act="attOut" data-id="${st.id}">Ketdi</button>` : "";
@@ -620,8 +625,15 @@ function pStaff(){
   </div>
 
   <div class="card">
-    <h3><span>${MONTHS[cur.getMonth()]} oyligi</span><span>${fmt(sum(act,st=>salaryInfo(st,m).rem))}</span></h3>
-    ${act.map(st=>{ const i=salaryInfo(st,m); return `
+    <h3><span>${MONTHS[cur.getMonth()]} oyligi</span><span>${fmt(sum(act,st=>Math.max(0,salaryInfo(st,m).rem)))}</span></h3>
+    ${act.map(st=>{ const i=salaryInfo(st,m);
+      if (!st.salary && st.role) { const got = sum(D.ops.filter(o=>o.kind==="exp"&&o.staffId===st.id&&o.date.startsWith(m)),o=>o.amount); return `
+      <div class="item" data-act="staffOpen" data-id="${st.id}" data-m="${m}">
+        <div class="ico">⭐</div>
+        <div class="mid"><div>${esc(st.name)} <span class="bdg">${esc(st.role)}</span></div><small>Shu oy kassadan olgan pullari</small></div>
+        <div class="amt">${fmt(got)}<small>olindi</small></div>
+      </div>`; }
+      return `
       <div class="item" data-act="staffOpen" data-id="${st.id}" data-m="${m}">
         <div class="ico">👔</div>
         <div class="mid"><div>${esc(st.name)}</div>
@@ -643,7 +655,7 @@ function pStaff(){
 
   <div class="card">
     <h3><span>Davomat · ${MONTHS[cur.getMonth()]}${isCur?" (hozirgacha)":""}</span></h3>
-    ${act.map(st=>{ const a=attStats(st,m); return `<div class="line" data-act="staffOpen" data-id="${st.id}" data-m="${m}">
+    ${wk.map(st=>{ const a=attStats(st,m); return `<div class="line" data-act="staffOpen" data-id="${st.id}" data-m="${m}">
       <span>${esc(st.name)}</span><span style="text-align:right;font-size:14px"><b>${a.days} kun</b> · ${fmtH(a.mins)}<br>
       <small class="${a.absent.length?"red":"lbl"}">${a.absent.length} kelmadi</small> · <small class="${a.late?"red":"lbl"}">${a.late} kech</small> · <small class="${a.early?"red":"lbl"}">${a.early} erta</small></span></div>`; }).join("")}
   </div>

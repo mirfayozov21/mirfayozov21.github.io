@@ -26,6 +26,7 @@ Opened from the owner's Telegram bot via BotFather → Menu Button → that URL.
   (month = whose salary it is; salary of month M is due on payDay of M+1), attendance `D.att` `{staffId, date, in, out}`
   with monthly totals. Schedule per staff: `start`, `end`, `dayOff` (0=Sunday..6), `trackFrom` (absences counted only from this date).
   Day swaps/exceptions in `D.dayx` `{staffId, date, type:"work"|"off"}` override the weekly day off.
+  Owner "Xikmatillo" (`role:"Rahbar"`, salary 0, `noAtt:true`) is seeded once via `D.bossInit`: no attendance, shows money taken this month.
   Stats: planned days, came, absent dates, worked on day off, late (in > start), early (out < end), hours.
 
 ## Data
