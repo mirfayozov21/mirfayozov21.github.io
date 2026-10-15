@@ -13,6 +13,7 @@ Opened from the owner's Telegram bot via BotFather → Menu Button → that URL.
   "Kassani yopish" form order: umumiy savdo (`total`) → humo → uzcard → hisob raqam (`bank`) → karta; `naqd` = total − those (auto).
   Same form records expenses of the shift as normal exp ops `{acc (naqd|karta|bank, chosen per row), saleId, smena}` (shown in Rasxod; replaced on edit, deleted with the sale).
   Rows of type Avans/Oylik become staff pay ops (`cat:"Oylik", staffId, ptype, month` — avans: month of date, oylik: previous month) and show in Xodimlar → "Berilgan pullar".
+  Both the kassa rows and the Rasxod form offer "⭐ Rahbar oldi" (= avans to `bossOf()`), "👔 Avans", "👔 Oylik" (staff picker); month via `payMonth()`.
   Money accounts are `naqd`, `karta`, `bank` ("Umumiy bank hisobi"): humo/uzcard/bank sales
   all land in `bank`; old ops/start values with acc `humo`/`uzcard` are mapped via `accOf()`. Day/month totals sum both shifts.
 - **Rasxod** — current balances (jami + naqd/karta/bank) on top; expense source picker shows each balance (`accChipsBal`); expenses by category and source account; transfers between accounts (`kind:"tr"`).

@@ -346,6 +346,9 @@ const nextMonth = m => { const d=new Date(+m.slice(0,4), +m.slice(5,7), 1); retu
 const prevMonth = m => { const d=new Date(+m.slice(0,4), +m.slice(5,7)-2, 1); return monthKey(d); };
 const getBonus = (sid,m) => (D.bonus.find(b=>b.staffId===sid&&b.month===m)||{}).amount||0;
 function setBonus(sid,m,a){ const b=D.bonus.find(x=>x.staffId===sid&&x.month===m); if(b) b.amount=a; else D.bonus.push({staffId:sid, month:m, amount:a}); }
+const bossOf = () => D.staff.find(st=>st.role==="Rahbar" && st.active!==false);
+/* avans — shu oy oyligi hisobidan, oylik — o'tgan oy uchun (oylik keyingi oyda beriladi) */
+const payMonth = (ptype, date) => ptype==="oylik" ? prevMonth(date.slice(0,7)) : date.slice(0,7);
 const staffPays = (sid,m) => D.ops.filter(o=>o.kind==="exp"&&o.staffId===sid&&(!m||o.month===m));
 function salaryInfo(st, m){
   const due = nextMonth(m)+"-"+String(st.payDay).padStart(2,"0");
@@ -767,15 +770,15 @@ function saleSheet(id, sm){
     r.naqd = r.total - bankPart(r) - r.karta; r.exp = sum(X.filter(x=>(x.acc||"naqd")==="naqd"), x=>x.amount); r.expOther = sum(X.filter(x=>(x.acc||"naqd")!=="naqd"), x=>x.amount); return r; };
   /* kassadan rasxodlar: alohida rasxod yozuvlari, saleId orqali shu savdoga bog'langan */
   /* turi: oddiy kategoriya yoki "__avans"/"__oylik" (xodimga pul — Xodimlar bo'limida ham ko'rinadi) */
-  let X = o ? D.ops.filter(x=>x.kind==="exp" && x.saleId===o.id).map(x=>({cat:x.staffId?"__"+x.ptype:x.cat, amount:x.amount, note:x.note||"", staffId:x.staffId||0, month:x.month, acc:accOf(x.acc)})) : [];
+  let X = o ? D.ops.filter(x=>x.kind==="exp" && x.saleId===o.id).map(x=>({cat:x.staffId?(bossOf()&&x.staffId===bossOf().id?"__boss":"__"+x.ptype):x.cat, amount:x.amount, note:x.note||"", staffId:x.staffId||0, month:x.month, acc:accOf(x.acc)})) : [];
   const XCATS = EXP_CATS.filter(c=>c!==STAFFCAT);
-  const XOPT = [["__avans","👔 Avans"],["__oylik","👔 Oylik"]].concat(XCATS.map(c=>[c,c]));
+  const XOPT = (bossOf()?[["__boss","⭐ Rahbar oldi"]]:[]).concat([["__avans","👔 Avans"],["__oylik","👔 Oylik"]], XCATS.map(c=>[c,c]));
   const staffOpts = () => D.staff.filter(st=>st.active!==false);
   const readX = () => { X = [...$("xRows").querySelectorAll(".xrow")].map((r,i)=>({cat:r.querySelector(".xc").value, amount:+(r.querySelector(".num").value.replace(/\D/g,""))||0,
-    note:r.querySelector(".xn").value.trim(), acc:r.querySelector(".xa").value, staffId:r.querySelector(".xs") ? +r.querySelector(".xs").value||0 : 0,
+    note:r.querySelector(".xn").value.trim(), acc:r.querySelector(".xa").value, staffId:r.querySelector(".xc").value==="__boss" ? (bossOf()||{}).id||0 : r.querySelector(".xs") ? +r.querySelector(".xs").value||0 : 0,
     month: X[i] && X[i].cat===r.querySelector(".xc").value ? X[i].month : undefined})); };
   const drawX = () => {
-    $("xRows").innerHTML = X.map((x,i)=>{ const isSt = x.cat.startsWith("__"); return `<div class="xrow">
+    $("xRows").innerHTML = X.map((x,i)=>{ const isSt = x.cat==="__avans"||x.cat==="__oylik"; return `<div class="xrow">
       <select class="xc">${(XOPT.some(c=>c[0]===x.cat)?XOPT:XOPT.concat([[x.cat,x.cat]])).map(([v,l])=>`<option value="${esc(v)}" ${v===x.cat?"selected":""}>${esc(l)}</option>`).join("")}</select>
       <input class="num" inputmode="numeric" placeholder="summa" value="${x.amount?fmt(x.amount):""}">
       <button type="button" class="x" data-xdel="${i}">×</button>
@@ -820,9 +823,8 @@ function saleSheet(id, sm){
     D.ops = D.ops.filter(x=>!(x.kind==="exp" && x.saleId===sale.id));
     X.filter(x=>x.amount).forEach(x=>{
       const base = {id:uid(), kind:"exp", acc:x.acc||"naqd", amount:x.amount, date:r.date, note:x.note, saleId:sale.id, smena:r.smena};
-      if (x.cat.startsWith("__")) { const ptype = x.cat.slice(2), mk = r.date.slice(0,7);
-        /* avans — shu oy oyligi hisobidan, oylik — o'tgan oy uchun (oylik keyingi oyda beriladi) */
-        D.ops.push({...base, cat:STAFFCAT, staffId:x.staffId, ptype, month: x.month || (ptype==="avans" ? mk : prevMonth(mk))});
+      if (x.cat.startsWith("__")) { const ptype = x.cat==="__boss" ? "avans" : x.cat.slice(2);
+        D.ops.push({...base, cat:STAFFCAT, staffId:x.staffId, ptype, month: x.month || payMonth(ptype, r.date)});
       } else D.ops.push({...base, cat:x.cat});
     });
     done();
@@ -834,7 +836,13 @@ function expSheet(id){
   const o = id ? D.ops.find(x=>x.id===id) : null;
   openSheet(`<h2>${o?"Rasxodni tahrirlash":"Yangi rasxod"}</h2>
     ${field("Summa", numIn("fAmt", o&&o.amount))}
-    ${field("Turi", chips("cat", [[SUPCAT,"🚚 Postavshikka"]].concat(EXP_CATS.map(c=>[c,c])), o?o.cat:"Boshqa"))}
+    ${field("Turi", chips("cat", (bossOf()?[["__boss","⭐ Rahbar oldi"]]:[]).concat([["__avans","👔 Avans"],["__oylik","👔 Oylik"],[SUPCAT,"🚚 Postavshikka"]],
+        EXP_CATS.filter(c=>c!==STAFFCAT || (o && o.cat===STAFFCAT)).map(c=>[c,c])), o?o.cat:"Boshqa"))}
+    <div id="expStaffBox" style="display:none">
+      <label>Kimga berildi</label>
+      ${chips("staff", D.staff.filter(st=>st.active!==false).map(st=>[String(st.id), (st.role?"⭐ ":"")+esc(st.name)]), "")}
+      <div class="lbl" id="esInfo" style="margin-top:6px"></div>
+    </div>
     <div id="expVendBox" style="display:none">
       <label>Qaysi postavshikka</label>
       <input id="evQ" placeholder="qidirish" autocomplete="off">
@@ -861,13 +869,30 @@ function expSheet(id){
     });
     $("evInfo").textContent = F.vendor ? `Qarzimiz: ${fmt(vendorDebt(F.vendor)+own(F.vendor))} so'm. To'lov shu qarzdan ayiriladi.` : "";
   };
-  const toggleV = () => { const on = F.cat===SUPCAT; $("expVendBox").style.display = on?"block":"none"; if (on) drawV(); };
+  const isStaffCat = () => F.cat==="__avans" || F.cat==="__oylik";
+  const staffInfo = () => {
+    const st = D.staff.find(x=>String(x.id)===F.staff);
+    if (!isStaffCat() || !st) { $("esInfo").textContent=""; return; }
+    const ptype = F.cat.slice(2), m = payMonth(ptype, $("fDate").value||today()), i = salaryInfo(st, m);
+    $("esInfo").textContent = st.salary ? `${mLabel(m)} oyligi: ${fmt(i.total)}, berilgan ${fmt(i.paid)}, qoldi ${fmt(Math.max(0,i.rem))} so'm` : "";
+  };
+  const toggleV = () => { const on = F.cat===SUPCAT; $("expVendBox").style.display = on?"block":"none"; if (on) drawV();
+    $("expStaffBox").style.display = isStaffCat() ? "block" : "none"; staffInfo(); };
   $("evQ").addEventListener("input", drawV);
-  F.onChip = (n)=>{ if (n==="cat") toggleV(); };
+  $("fDate").addEventListener("change", staffInfo);
+  F.onChip = (n)=>{ if (n==="cat") toggleV(); if (n==="staff") staffInfo(); };
   toggleV();
   bind(()=>{
     const amount = num("fAmt"); if (!amount) return bad("fAmt");
     const r = {amount, cat:F.cat, acc:F.acc, date:$("fDate").value||today(), note:$("fNote").value.trim()};
+    if (r.cat.startsWith("__")) {
+      const ptype = r.cat==="__boss" ? "avans" : r.cat.slice(2);
+      const sid = r.cat==="__boss" ? bossOf().id : +F.staff;
+      if (!sid) { alertMsg("Kimga berilganini tanlang."); return; }
+      if (o) { D.ops = D.ops.filter(x=>x!==o); unapplyPay(o.id); }
+      D.ops.push({id:uid(), kind:"exp", amount, cat:STAFFCAT, staffId:sid, ptype, month:payMonth(ptype, r.date), acc:F.acc, date:r.date, note:r.note});
+      return done();
+    }
     if (r.cat===SUPCAT) {
       if (!F.vendor) { alertMsg("Postavshikni tanlang"); return; }
       const debt = vendorDebt(F.vendor) + own(F.vendor);
