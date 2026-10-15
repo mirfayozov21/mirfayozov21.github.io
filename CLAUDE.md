@@ -12,6 +12,7 @@ Opened from the owner's Telegram bot via BotFather → Menu Button → that URL.
 - **Savdo** — sales per cash shift (`smena`: 1 = 08:00–18:00, 2 = 18:00–23:00; old entries have none).
   "Kassani yopish" form order: umumiy savdo (`total`) → humo → uzcard → hisob raqam (`bank`); `naqd` = total − those (auto).
   Same form records cash expenses of the shift as normal exp ops `{acc:"naqd", saleId, smena}` (shown in Rasxod; replaced on edit, deleted with the sale).
+  Rows of type Avans/Oylik become staff pay ops (`cat:"Oylik", staffId, ptype, month` — avans: month of date, oylik: previous month) and show in Xodimlar → "Berilgan pullar".
   Money accounts are only `naqd`, `bank` ("Umumiy bank hisobi") and legacy `karta` (shown only if used): humo/uzcard/bank sales
   all land in `bank`; old ops/start values with acc `humo`/`uzcard` are mapped via `accOf()`. Day/month totals sum both shifts.
 - **Rasxod** — expenses by category and source account; transfers between accounts (`kind:"tr"`).
