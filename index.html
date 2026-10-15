@@ -113,11 +113,11 @@ h3{font-size:14px}
 .line.total{border-top:2px solid var(--bg2);border-bottom:none;margin-top:4px;font-weight:700}
 .hero{background:linear-gradient(135deg,var(--btn),color-mix(in srgb,var(--btn) 70%,#000));color:var(--btnText)}
 .hero .lbl{color:var(--btnText);opacity:.8}
-.split{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px}
-.split>div{border-radius:12px;padding:10px 12px;background:var(--bg2);min-width:0}
+.split{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:6px}
+.split>div{border-radius:12px;padding:9px 10px;background:var(--bg2);min-width:0}
 .hero .split>div{background:rgba(255,255,255,.16)}
 .split small{display:block;font-size:12px;opacity:.8}
-.split b{display:block;font-size:18px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.split b{display:block;font-size:16px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .parts{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;margin-top:8px;opacity:.85}
 .parts b{font-weight:600}
 .shifts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
@@ -139,7 +139,8 @@ input.num.total{font-size:24px;padding:14px;border:2px solid var(--btn)}
 .xrow select,.xrow input{background:var(--bg);padding:10px;font-size:15px}
 .xrow select{width:100%;border:none;border-radius:10px;color:var(--text)}
 .xrow input.num{font-size:16px}
-.xrow .xn,.xrow .xs{grid-column:1/-1}
+.xrow .xs{grid-column:1/-1}
+.xrow .xn{grid-column:2/-1}
 .addx{width:100%;border:1.5px dashed var(--btn);background:none;color:var(--btn);border-radius:12px;padding:11px;font-size:15px;font-weight:600}
 </style>
 </head>
@@ -188,8 +189,7 @@ const ACC = {naqd:"💵 Naqd kassa", bank:"🏦 Umumiy bank hisobi", karta:"💳
 const accOf = k => (k==="humo"||k==="uzcard") ? "bank" : (ACC[k] ? k : "naqd");
 const accLabel = k => ACC[accOf(k)];
 /* "Karta" hisobi faqat ilgari ishlatilgan bo'lsa ko'rsatiladi */
-const kartaUsed = () => !!(D.start.karta || D.ops.some(o=>o.karta || o.acc==="karta" || o.to==="karta") || D.cust.some(c=>c.acc==="karta") || D.sups.some(s=>s.pays.some(p=>p.acc==="karta")));
-const accs = () => kartaUsed() ? ["naqd","bank","karta"] : ["naqd","bank"];
+const accs = () => ["naqd","karta","bank"];
 const bankPart = o => sum(BANKCH, k=>o[k]||0);
 const SMENA = {1:"1-kassa · 08:00–18:00", 2:"2-kassa · 18:00–23:00"};
 const smenaShort = n => n ? `${n}-kassa` : "Kun bo'yi";
@@ -449,8 +449,8 @@ function saleSplit(xs){
   const t = {}; SALES.forEach(k=>t[k]=sum(xs,o=>o[k]||0));
   return `<div class="split">
       <div><small>💵 Naqd</small><b>${fmt(t.naqd)}</b></div>
+      <div><small>💳 Karta</small><b>${fmt(t.karta)}</b></div>
       <div><small>🏦 Umumiy bank hisobi</small><b>${fmt(bankPart(t))}</b></div>
-      ${t.karta?`<div><small>💳 Karta</small><b>${fmt(t.karta)}</b></div>`:""}
     </div>
     <div class="parts">${BANKCH.map(k=>`<span>${SALE[k].split(" ").slice(1).join(" ")} <b>${fmt(t[k])}</b></span>`).join("")}</div>`;
 }
@@ -543,7 +543,13 @@ function pExp(){
   const total = sum(exps,o=>o.amount);
   const byCat = {}; exps.forEach(o=>byCat[o.cat]=(byCat[o.cat]||0)+o.amount);
   const cats = Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
+  const b = balances();
   return `${monthBar()}
+  <div class="card hero">
+    <div class="lbl">Hozir mavjud pul (jami)</div>
+    <div class="big">${sm(sum(accs(),k=>b[k]))} <span>so'm</span></div>
+    <div class="split">${accs().map(k=>`<div><small>${ACC[k]}</small><b>${sm(b[k])}</b></div>`).join("")}</div>
+  </div>
   <div class="row2"><button class="addbtn" data-act="expNew">+ Rasxod</button><button class="addbtn ghost" data-act="trNew">↔ O'tkazma</button></div>
   <div class="card">
     <div class="lbl">Oy rasxodi</div>
@@ -722,6 +728,8 @@ const numIn = (id,v) => `<input class="num" id="${id}" inputmode="numeric" place
 const dateIn = (id,v) => `<input id="${id}" type="date" value="${v||today()}">`;
 const textIn = (id,v,ph,list) => `<input id="${id}" value="${esc(v)}" placeholder="${ph||""}" ${list?`list="${list}"`:""} autocomplete="off">`;
 function chips(name, opts, sel){ F[name]=sel; return `<div class="chips" data-chip="${name}">${opts.map(([v,l])=>`<button type="button" data-v="${esc(v)}" class="${v===sel?"on":""}">${l}</button>`).join("")}</div>`; }
+/* hisob tanlash + har birida hozirgi qoldiq */
+const accChipsBal = (name, sel) => { const b = balances(); return chips(name, accs().map(k=>[k,`${ACC[k]} · ${sm(b[k])}`]), accOf(sel)); };
 const accChips = (name, sel) => chips(name, accs().map(k=>[k,ACC[k]]), accOf(sel));
 const actions = del => `<div class="actions"><button class="cancel" id="cancelBtn">Bekor</button><button class="save" id="saveBtn">Saqlash</button></div>${del?`<button class="del" id="delBtn">O'chirish</button>`:""}`;
 function bind(onSave, onDel){
@@ -739,7 +747,6 @@ function done(keepOpen){ haptic("success"); if(!keepOpen) closeSheet(); save(); 
 /* --- Savdo --- */
 function saleSheet(id, sm){
   const o = id ? D.ops.find(x=>x.id===id) : null;
-  const showK = !!(o && o.karta);
   openSheet(`<h2>${o?"Savdoni tahrirlash":"Kassani yopish"}</h2>
     ${field("Kassa", chips("smena", [["1","☀️ "+SMENA[1]],["2","🌙 "+SMENA[2]]], o ? String(o.smena||"") : String(sm||nowSmena())))}
     <div class="lbl" id="smWarn" style="margin-top:6px;color:var(--orange)"></div>
@@ -749,23 +756,23 @@ function saleSheet(id, sm){
     <label class="step"><i>2</i>${SALE.humo}</label>${numIn("f_humo", o&&o.humo)}
     <label class="step"><i>3</i>${SALE.uzcard}</label>${numIn("f_uzcard", o&&o.uzcard)}
     <label class="step"><i>4</i>${SALE.bank}</label>${numIn("f_bank", o&&o.bank)}
-    ${showK?field(SALE.karta, numIn("f_karta", o.karta)):""}
-    <label class="step"><i>5</i>Kassadan qilingan rasxodlar</label>
+    <label class="step"><i>5</i>${SALE.karta}</label>${numIn("f_karta", o&&o.karta)}
+    <label class="step"><i>6</i>Kassadan qilingan rasxodlar</label>
     <div id="xRows"></div>
     <button type="button" class="addx" id="xAdd">+ Rasxod qo'shish</button>
     <div class="calc" id="calc"></div>
     ${field("Izoh", textIn("fNote", o?o.note:"", "ixtiyoriy"))}
     ${actions(!!o)}`);
-  const vals = () => { const r = {total:num("f_total"), humo:num("f_humo"), uzcard:num("f_uzcard"), bank:num("f_bank"), karta:showK?num("f_karta"):0};
-    r.naqd = r.total - bankPart(r) - r.karta; r.exp = sum(X, x=>x.amount); return r; };
+  const vals = () => { const r = {total:num("f_total"), humo:num("f_humo"), uzcard:num("f_uzcard"), bank:num("f_bank"), karta:num("f_karta")};
+    r.naqd = r.total - bankPart(r) - r.karta; r.exp = sum(X.filter(x=>(x.acc||"naqd")==="naqd"), x=>x.amount); r.expOther = sum(X.filter(x=>(x.acc||"naqd")!=="naqd"), x=>x.amount); return r; };
   /* kassadan rasxodlar: alohida rasxod yozuvlari, saleId orqali shu savdoga bog'langan */
   /* turi: oddiy kategoriya yoki "__avans"/"__oylik" (xodimga pul — Xodimlar bo'limida ham ko'rinadi) */
-  let X = o ? D.ops.filter(x=>x.kind==="exp" && x.saleId===o.id).map(x=>({cat:x.staffId?"__"+x.ptype:x.cat, amount:x.amount, note:x.note||"", staffId:x.staffId||0, month:x.month})) : [];
+  let X = o ? D.ops.filter(x=>x.kind==="exp" && x.saleId===o.id).map(x=>({cat:x.staffId?"__"+x.ptype:x.cat, amount:x.amount, note:x.note||"", staffId:x.staffId||0, month:x.month, acc:accOf(x.acc)})) : [];
   const XCATS = EXP_CATS.filter(c=>c!==STAFFCAT);
   const XOPT = [["__avans","👔 Avans"],["__oylik","👔 Oylik"]].concat(XCATS.map(c=>[c,c]));
   const staffOpts = () => D.staff.filter(st=>st.active!==false);
   const readX = () => { X = [...$("xRows").querySelectorAll(".xrow")].map((r,i)=>({cat:r.querySelector(".xc").value, amount:+(r.querySelector(".num").value.replace(/\D/g,""))||0,
-    note:r.querySelector(".xn").value.trim(), staffId:r.querySelector(".xs") ? +r.querySelector(".xs").value||0 : 0,
+    note:r.querySelector(".xn").value.trim(), acc:r.querySelector(".xa").value, staffId:r.querySelector(".xs") ? +r.querySelector(".xs").value||0 : 0,
     month: X[i] && X[i].cat===r.querySelector(".xc").value ? X[i].month : undefined})); };
   const drawX = () => {
     $("xRows").innerHTML = X.map((x,i)=>{ const isSt = x.cat.startsWith("__"); return `<div class="xrow">
@@ -773,7 +780,8 @@ function saleSheet(id, sm){
       <input class="num" inputmode="numeric" placeholder="summa" value="${x.amount?fmt(x.amount):""}">
       <button type="button" class="x" data-xdel="${i}">×</button>
       ${isSt?`<select class="xs"><option value="">— xodimni tanlang —</option>${staffOpts().map(st=>`<option value="${st.id}" ${st.id===x.staffId?"selected":""}>${esc(st.name)}</option>`).join("")}</select>`:""}
-      <input class="xn" placeholder="${isSt?"izoh (ixtiyoriy)":"izoh (masalan: non, suv)"}" value="${esc(x.note)}">
+      <select class="xa">${accs().map(k=>`<option value="${k}" ${k===(x.acc||"naqd")?"selected":""}>${ACC[k].replace("Umumiy bank hisobi","Bank hisobi")}</option>`).join("")}</select>
+      <input class="xn" placeholder="${isSt?"izoh":"izoh (non, suv)"}" value="${esc(x.note)}">
     </div>`; }).join("") || `<div class="lbl" style="margin:2px 0 6px">Bugun kassadan rasxod qilinmagan bo'lsa, bo'sh qoldiring.</div>`;
     $("xRows").querySelectorAll("[data-xdel]").forEach(b=>b.onclick=()=>{ readX(); X.splice(+b.dataset.xdel,1); drawX(); calc(); });
   };
@@ -782,15 +790,16 @@ function saleSheet(id, sm){
     $("calc").innerHTML = `
       <div class="line"><span>🏦 Umumiy bank hisobiga</span><b>${fmt(bankPart(v))}</b></div>
       <div class="sub">${[["Humo",v.humo],["Uzcard",v.uzcard],["Hisob raqam",v.bank]].map(([l,x])=>`<span style="white-space:nowrap">${l} ${fmt(x)}</span>`).join(" + ")}</div>
-      ${showK?`<div class="line"><span>💳 Karta</span><b>${fmt(v.karta)}</b></div>`:""}
+      <div class="line"><span>💳 Karta</span><b>${fmt(v.karta)}</b></div>
       <div class="line ${neg?"red":""}"><span>💵 Naqd savdo</span><b>${(neg?"−":"")+fmt(Math.abs(v.naqd))}</b></div>
-      ${v.exp?`<div class="line"><span>💸 Kassadan rasxod</span><b class="red">−${fmt(v.exp)}</b></div>`:""}
+      ${v.exp?`<div class="line"><span>💸 Naqddan rasxod</span><b class="red">−${fmt(v.exp)}</b></div>`:""}
       <div class="line cash ${neg||v.naqd-v.exp<0?"red":""}"><span>💵 Kassada qolishi kerak</span><b>${(v.naqd-v.exp<0?"−":"")+fmt(Math.abs(v.naqd-v.exp))}</b></div>
-      <div class="sub ${neg?"red":""}">${neg?"Naqdsiz tushum umumiy savdodan ko'p — summalarni tekshiring.":"Naqd savdo avtomatik: umumiy savdo − Humo − Uzcard − Hisob raqam."}</div>`;
+      <div class="sub ${neg?"red":""}">${neg?"Naqdsiz tushum umumiy savdodan ko'p — summalarni tekshiring.":"Naqd savdo avtomatik: umumiy savdo − Humo − Uzcard − Hisob raqam − Karta."}</div>
+      ${v.expOther?`<div class="sub">Karta yoki bank hisobidan qilingan rasxodlar: ${fmt(v.expOther)} — o'sha hisoblardan ayiriladi.</div>`:""}`;
   };
   $("sheet").oninput = e => { if (e.target.closest("#xRows")) readX(); calc(); };
   $("sheet").onchange = e => { if (e.target.closest("#xRows")) { readX(); if (e.target.classList.contains("xc")) drawX(); } };
-  $("xAdd").onclick = () => { readX(); X.push({cat:"Ovqat", amount:0, note:""}); drawX(); const r=$("xRows").querySelectorAll(".xrow"); r[r.length-1].querySelector(".num").focus(); };
+  $("xAdd").onclick = () => { readX(); X.push({cat:"Ovqat", amount:0, note:"", acc:"naqd"}); drawX(); const r=$("xRows").querySelectorAll(".xrow"); r[r.length-1].querySelector(".num").focus(); };
   drawX(); calc();
   const dup = () => D.ops.find(x=>x.kind==="sale" && x!==o && x.date===($("fDate").value||today()) && String(x.smena||"")===String(F.smena||""));
   const warn = () => { const d=dup(); $("smWarn").textContent = d ? `Bu kassa shu kuni allaqachon kiritilgan (${fmt(saleTotal(d))} so'm). Saqlasangiz, ustiga qo'shiladi.` : ""; };
@@ -800,7 +809,7 @@ function saleSheet(id, sm){
   bind(()=>{
     const v = vals();
     if (!v.total) return bad("f_total");
-    if (v.naqd < 0) { alertMsg("Humo, Uzcard va hisob raqamga tushgan pul umumiy savdodan ko'p bo'lishi mumkin emas."); return bad("f_total"); }
+    if (v.naqd < 0) { alertMsg("Humo, Uzcard, hisob raqam va kartaga tushgan pul umumiy savdodan ko'p bo'lishi mumkin emas."); return bad("f_total"); }
     readX();
     if (X.some(x=>!x.amount && (x.note || x.staffId))) { alertMsg("Rasxod summasini kiriting yoki qatorni o'chiring (×)."); return; }
     if (X.some(x=>x.amount && x.cat.startsWith("__") && !x.staffId)) { alertMsg("Avans yoki oylik kimga berilganini tanlang."); return; }
@@ -810,7 +819,7 @@ function saleSheet(id, sm){
     if (o) Object.assign(o,r); else { sale = {id:uid(), kind:"sale", ...r}; D.ops.push(sale); }
     D.ops = D.ops.filter(x=>!(x.kind==="exp" && x.saleId===sale.id));
     X.filter(x=>x.amount).forEach(x=>{
-      const base = {id:uid(), kind:"exp", acc:"naqd", amount:x.amount, date:r.date, note:x.note, saleId:sale.id, smena:r.smena};
+      const base = {id:uid(), kind:"exp", acc:x.acc||"naqd", amount:x.amount, date:r.date, note:x.note, saleId:sale.id, smena:r.smena};
       if (x.cat.startsWith("__")) { const ptype = x.cat.slice(2), mk = r.date.slice(0,7);
         /* avans — shu oy oyligi hisobidan, oylik — o'tgan oy uchun (oylik keyingi oyda beriladi) */
         D.ops.push({...base, cat:STAFFCAT, staffId:x.staffId, ptype, month: x.month || (ptype==="avans" ? mk : prevMonth(mk))});
@@ -832,7 +841,7 @@ function expSheet(id){
       <div class="vchips" id="evChips"></div>
       <div class="lbl" id="evInfo" style="margin-top:6px"></div>
     </div>
-    ${field("Qayerdan to'landi", accChips("acc", o?o.acc:"naqd"))}
+    ${field("Qayerdan to'landi", accChipsBal("acc", o?o.acc:"naqd"))}
     ${field("Sana", dateIn("fDate", o&&o.date))}
     ${field("Izoh", textIn("fNote", o?o.note:"", "masalan: elektr uchun"))}
     ${actions(!!o)}`);
@@ -876,7 +885,7 @@ function trSheet(id){
   const o = id ? D.ops.find(x=>x.id===id) : null;
   openSheet(`<h2>Hisoblar orasida o'tkazma</h2>
     <div class="lbl" style="margin-top:4px">Masalan: kassadagi naqd pulni bankka topshirdingiz yoki bankdan naqd yechib oldingiz.</div>
-    ${field("Qayerdan", accChips("from", o?o.acc:"naqd"))}
+    ${field("Qayerdan", accChipsBal("from", o?o.acc:"naqd"))}
     ${field("Qayerga", accChips("to", o?o.to:"bank"))}
     ${field("Summa", numIn("fAmt", o&&o.amount))}
     ${field("Sana", dateIn("fDate", o&&o.date))}
@@ -927,7 +936,7 @@ function supNewSheet(pre){
     ${field("Kelgan sana", dateIn("fDate"))}
     ${field("Necha kunga qarzga berdi", `<input id="fDays" inputmode="numeric" value="${pv?pv.days:15}">`)}
     ${field("Hozir to'langan summa (bo'lsa)", numIn("fPaid"))}
-    <div id="paidAccBox" style="display:none">${field("Qayerdan to'landi", accChips("acc","naqd"))}</div>
+    <div id="paidAccBox" style="display:none">${field("Qayerdan to'landi", accChipsBal("acc","naqd"))}</div>
     ${field("Izoh", textIn("fNote","","masalan: nakladnoy №"))}
     ${field("Nakladnoy rasmlari", `<div class="thumbs" id="thumbs"></div>${photoPicker()}`)}
     ${actions(false)}`);
@@ -982,7 +991,7 @@ function supSheet(id){
     ${s.pays.length?`<h4>To'lovlar</h4><div class="box">${s.pays.map(p=>`<div class="line"><span>${fd(p.date)} · ${accLabel(p.acc)}</span><span><b>${fmt(p.amount)}</b><button class="x" data-payDel="${p.id}">×</button></span></div>`).join("")}</div>`:""}
     ${i.rem>0?`<h4>To'lov qilish</h4>
       ${numIn("pAmt", i.rem)}
-      ${field("Qayerdan", accChips("acc","naqd"))}
+      ${field("Qayerdan", accChipsBal("acc","naqd"))}
       ${field("Sana", dateIn("pDate"))}
       <div class="actions"><button class="save" id="payBtn">To'lovni saqlash</button></div>`:""}
     <h4>Ma'lumotni tahrirlash</h4>
@@ -1141,7 +1150,7 @@ function staffPaySheet(sid, opId, m){
     ${field("Qaysi oy oyligidan", `<input id="pMonth" type="month" value="${defMonth}">`)}
     <div class="lbl" id="pInfo" style="margin-top:6px"></div>
     ${field("Summa", numIn("pAmt", o&&o.amount))}
-    ${field("Qayerdan berildi", accChips("acc", o?o.acc:"naqd"))}
+    ${field("Qayerdan berildi", accChipsBal("acc", o?o.acc:"naqd"))}
     ${field("Berilgan sana", dateIn("pDate", o&&o.date))}
     ${field("Izoh", textIn("pNote", o?o.note:"", "ixtiyoriy"))}
     ${actions(!!o)}`);

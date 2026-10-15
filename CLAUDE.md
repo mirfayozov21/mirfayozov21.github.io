@@ -10,12 +10,12 @@ Opened from the owner's Telegram bot via BotFather → Menu Button → that URL.
 ## Features (bottom nav tabs)
 - **Asosiy** — today's sales by payment method, account balances, supplier payment warnings, debts, month summary.
 - **Savdo** — sales per cash shift (`smena`: 1 = 08:00–18:00, 2 = 18:00–23:00; old entries have none).
-  "Kassani yopish" form order: umumiy savdo (`total`) → humo → uzcard → hisob raqam (`bank`); `naqd` = total − those (auto).
-  Same form records cash expenses of the shift as normal exp ops `{acc:"naqd", saleId, smena}` (shown in Rasxod; replaced on edit, deleted with the sale).
+  "Kassani yopish" form order: umumiy savdo (`total`) → humo → uzcard → hisob raqam (`bank`) → karta; `naqd` = total − those (auto).
+  Same form records expenses of the shift as normal exp ops `{acc (naqd|karta|bank, chosen per row), saleId, smena}` (shown in Rasxod; replaced on edit, deleted with the sale).
   Rows of type Avans/Oylik become staff pay ops (`cat:"Oylik", staffId, ptype, month` — avans: month of date, oylik: previous month) and show in Xodimlar → "Berilgan pullar".
-  Money accounts are only `naqd`, `bank` ("Umumiy bank hisobi") and legacy `karta` (shown only if used): humo/uzcard/bank sales
+  Money accounts are `naqd`, `karta`, `bank` ("Umumiy bank hisobi"): humo/uzcard/bank sales
   all land in `bank`; old ops/start values with acc `humo`/`uzcard` are mapped via `accOf()`. Day/month totals sum both shifts.
-- **Rasxod** — expenses by category and source account; transfers between accounts (`kind:"tr"`).
+- **Rasxod** — current balances (jami + naqd/karta/bank) on top; expense source picker shows each balance (`accChipsBal`); expenses by category and source account; transfers between accounts (`kind:"tr"`).
   Category `Postavshikka` = payment to a supplier: it is applied to that supplier's unpaid deliveries
   (oldest due date first) and is NOT counted as an operating expense.
 - **Postavshik** — supplier deliveries (date, amount, credit days → due date, "N kun qoldi / o'tib ketdi"),
