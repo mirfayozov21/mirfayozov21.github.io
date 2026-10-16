@@ -43,6 +43,8 @@ Stored per Telegram user in Telegram CloudStorage (JSON split into keys `d0..dN`
 plus a localStorage mirror (`dokon_v2`). Keep backward compatibility in `normalize()` — never break existing data.
 
 ## Photos
+Receipt ("chek") photos: sale ops and exp ops have optional `photos:[path]` (kassa closing step 7 and Rasxod form),
+via the shared `photoBox()` + `withPhotos()` helpers (upload on save; already-uploaded paths kept on retry).
 Invoice photos go to Supabase Storage, project `eormaktfhkaygogibtul`, public bucket `nakladnoy`
 (insert-only policy for anon; 3 MB limit; jpeg/png/webp). Client compresses to ≤1600px JPEG before upload.
 The publishable key in `index.html` is public by design; never put a secret/service_role key in this repo.

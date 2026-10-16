@@ -251,6 +251,34 @@ async function uploadPhoto(file){
 function alertMsg(m){ if (tg && tg.showAlert && tg.isVersionAtLeast("6.2")) tg.showAlert(m); else alert(m); }
 function showPhoto(url){ $("viewerImg").src=url; $("viewer").classList.add("show"); updateBack(); }
 const thumbsHtml = (list, rmAttr) => list.map((p,i)=>`<div class="thumb"><img src="${esc(photoUrl(p))}" data-view="${esc(photoUrl(p))}" loading="lazy" alt=""><button class="rm" ${rmAttr}="${i}">×</button></div>`).join("");
+/* Rasm biriktirish (chek, nakladnoy): mavjud rasmlar + saqlashda yuklanadigan yangi rasmlar */
+function photoBox(existing){
+  const keep = (existing||[]).slice(), pend = [];
+  const draw = () => {
+    const all = keep.concat(pend.map(x=>x.url));
+    $("thumbs").innerHTML = thumbsHtml(all, "data-rmx");
+    $("thumbs").querySelectorAll("[data-rmx]").forEach(b=>b.onclick=e=>{ e.stopPropagation(); const i=+b.dataset.rmx;
+      if (i<keep.length) keep.splice(i,1); else { const [x]=pend.splice(i-keep.length,1); URL.revokeObjectURL(x.url); } draw(); });
+  };
+  $("fPhoto").onchange = e => { [...e.target.files].forEach(f=>pend.push({file:f, url:URL.createObjectURL(f)})); e.target.value=""; draw(); };
+  draw();
+  return { async upload(btn){
+    const out = keep.slice();
+    for (let i=0;i<pend.length;i++){ if (btn) btn.textContent = `Rasm yuklanmoqda ${i+1}/${pend.length}...`; out.push(await uploadPhoto(pend[i].file)); }
+    pend.forEach(x=>URL.revokeObjectURL(x.url)); pend.length = 0; keep.length = 0; keep.push(...out);
+    return out;
+  }, get count(){ return keep.length + pend.length; } };
+}
+/* saqlash tugmasi: rasmlarni yuklab, keyin fn(photos) ni chaqiradi */
+async function withPhotos(pb, fn){
+  const btn = $("saveBtn"); if (btn.disabled) return;
+  btn.disabled = true;
+  let photos;
+  try { photos = await pb.upload(btn); }
+  catch(e) { btn.disabled = false; btn.textContent = "Saqlash"; return alertMsg("Rasm yuklanmadi. Internetni tekshirib, qayta urinib ko'ring.\n\n" + (e.message||e)); }
+  btn.disabled = false; btn.textContent = "Saqlash";
+  fn(photos);
+}
 const photoPicker = () => `<label class="photoBtn" id="photoLbl">📷 Rasm qo'shish<input type="file" accept="image/*" multiple id="fPhoto" hidden></label>`;
 
 function balances(){
@@ -533,7 +561,7 @@ function pSale(){
         <h3><span>${fd(d)}</span><span class="green">${fmt(sum(xs,saleTotal))} so'm</span></h3>
         ${xs.map(o=>`<div class="item" data-act="saleEdit" data-id="${o.id}">
           <div class="ico">${o.smena?(+o.smena===1?"☀️":"🌙"):"🛒"}</div>
-          <div class="mid"><div>${smenaShort(+o.smena)}</div><small>Naqd ${fmt(o.naqd||0)} · Bank ${fmt(bankPart(o))}${o.karta?" · Karta "+fmt(o.karta):""}${(()=>{ const e=sum(D.ops.filter(x=>x.kind==="exp"&&x.saleId===o.id),x=>x.amount); const q=sum(D.cust.filter(c=>c.saleId===o.id),c=>c.amount); return (e?` · <span class="red">Rasxod ${fmt(e)}</span>`:"")+(q?` · <span class="orange">Qarzga ${fmt(q)}</span>`:""); })()}${o.note?" · "+esc(o.note):""}</small></div>
+          <div class="mid"><div>${smenaShort(+o.smena)}${(o.photos||[]).length?` <span class="bdg">🧾 ${o.photos.length}</span>`:""}</div><small>Naqd ${fmt(o.naqd||0)} · Bank ${fmt(bankPart(o))}${o.karta?" · Karta "+fmt(o.karta):""}${(()=>{ const e=sum(D.ops.filter(x=>x.kind==="exp"&&x.saleId===o.id),x=>x.amount); const q=sum(D.cust.filter(c=>c.saleId===o.id),c=>c.amount); return (e?` · <span class="red">Rasxod ${fmt(e)}</span>`:"")+(q?` · <span class="orange">Qarzga ${fmt(q)}</span>`:""); })()}${o.note?" · "+esc(o.note):""}</small></div>
           <div class="amt">${fmt(saleTotal(o))}</div>
         </div>`).join("")}
       </div>`; }).join("") : `<div class="card"><div class="empty">Bu oyda savdo kiritilmagan</div></div>`}`;
@@ -565,7 +593,7 @@ function pExp(){
     ${list.length ? list.map(o=> o.kind==="exp" ? `
       <div class="item" data-act="${o.staffId?"staffPayEdit":"expEdit"}" data-id="${o.id}">
         <div class="ico">${o.cat===SUPCAT?"🚚":o.staffId?"👔":o.saleId?"🧾":"💸"}</div>
-        <div class="mid"><div>${o.cat===SUPCAT?"Postavshikka: "+esc(o.vendor):o.staffId?`${o.ptype==="avans"?"Avans":"Oylik"}: ${esc((D.staff.find(x=>x.id===o.staffId)||{}).name||"xodim")} (${mLabel(o.month)})`:esc(o.cat)}</div><small>${fd(o.date)} · ${o.saleId?`🧾 ${smenaShort(+o.smena)}dan`:accLabel(o.acc)}${o.note?" · "+esc(o.note):""}</small></div>
+        <div class="mid"><div>${o.cat===SUPCAT?"Postavshikka: "+esc(o.vendor):o.staffId?`${o.ptype==="avans"?"Avans":"Oylik"}: ${esc((D.staff.find(x=>x.id===o.staffId)||{}).name||"xodim")} (${mLabel(o.month)})`:esc(o.cat)}</div><small>${(o.photos||[]).length?`📎${o.photos.length} · `:""}${fd(o.date)} · ${o.saleId?`🧾 ${smenaShort(+o.smena)}dan`:accLabel(o.acc)}${o.note?" · "+esc(o.note):""}</small></div>
         <div class="amt red">−${fmt(o.amount)}</div>
       </div>` : `
       <div class="item" data-act="trEdit" data-id="${o.id}">
@@ -775,6 +803,9 @@ function saleSheet(id, sm){
     <div id="xRows"></div>
     <button type="button" class="addx" id="xAdd">+ Rasxod qo'shish</button>
     <div class="calc" id="calc"></div>
+    <label class="step"><i>7</i>🧾 Chek rasmlari</label>
+    <div class="lbl" style="margin:-2px 0 6px">Z-hisobot, terminal cheklari, qarzga berilgan tovar cheki va h.k.</div>
+    <div class="thumbs" id="thumbs"></div>${photoPicker()}
     ${field("Izoh", textIn("fNote", o?o.note:"", "ixtiyoriy"))}
     ${actions(!!o)}`);
   const vals = () => { const r = {total:num("f_total"), humo:num("f_humo"), uzcard:num("f_uzcard"), bank:num("f_bank"), karta:num("f_karta")};
@@ -825,6 +856,7 @@ function saleSheet(id, sm){
   F.onChip = n => { if (n==="smena") warn(); };
   $("fDate").addEventListener("change", warn); warn();
   if (!o) setTimeout(()=>{ try { $("f_total").focus(); } catch(e){} }, 250);
+  const pb = photoBox(o && o.photos);
   bind(()=>{
     const v = vals();
     if (!v.total) return bad("f_total");
@@ -833,8 +865,9 @@ function saleSheet(id, sm){
     if (X.some(x=>!x.amount && (x.note || x.staffId))) { alertMsg("Rasxod summasini kiriting yoki qatorni o'chiring (×)."); return; }
     if (X.some(x=>x.amount && x.cat==="__qarz" && !x.cust)) { alertMsg("Qarzga kimga berilganini yozing (klient ismi)."); return; }
     if (X.some(x=>x.amount && x.cat.startsWith("__") && x.cat!=="__qarz" && !x.staffId)) { alertMsg("Avans yoki oylik kimga berilganini tanlang."); return; }
+    withPhotos(pb, photos => {
     const r = {date:$("fDate").value||today(), note:$("fNote").value.trim(), smena: F.smena ? +F.smena : undefined,
-               total:v.total, naqd:v.naqd, humo:v.humo, uzcard:v.uzcard, bank:v.bank, karta:v.karta};
+               total:v.total, naqd:v.naqd, humo:v.humo, uzcard:v.uzcard, bank:v.bank, karta:v.karta, photos};
     let sale = o;
     if (o) Object.assign(o,r); else { sale = {id:uid(), kind:"sale", ...r}; D.ops.push(sale); }
     D.ops = D.ops.filter(x=>!(x.kind==="exp" && x.saleId===sale.id));
@@ -850,6 +883,7 @@ function saleSheet(id, sm){
       } else D.ops.push({...base, cat:x.cat});
     });
     done();
+    });
   }, o && (()=>{ D.ops=D.ops.filter(x=>x!==o && !(x.kind==="exp" && x.saleId===o.id)); D.cust=D.cust.filter(c=>c.saleId!==o.id); }));
 }
 
@@ -874,7 +908,9 @@ function expSheet(id){
     ${field("Qayerdan to'landi", accChipsBal("acc", o?o.acc:"naqd"))}
     ${field("Sana", dateIn("fDate", o&&o.date))}
     ${field("Izoh", textIn("fNote", o?o.note:"", "masalan: elektr uchun"))}
+    ${field("🧾 Chek rasmi", `<div class="thumbs" id="thumbs"></div>${photoPicker()}`)}
     ${actions(!!o)}`);
+  const pb = photoBox(o && o.photos);
   F.vendor = o && o.cat===SUPCAT ? o.vendor : "";
   const own = name => (o && o.cat===SUPCAT && vkey(o.vendor)===vkey(name)) ? o.amount : 0;
   const drawV = () => {
@@ -906,13 +942,18 @@ function expSheet(id){
   toggleV();
   bind(()=>{
     const amount = num("fAmt"); if (!amount) return bad("fAmt");
-    const r = {amount, cat:F.cat, acc:F.acc, date:$("fDate").value||today(), note:$("fNote").value.trim()};
+    if (F.cat.startsWith("__") && F.cat!=="__boss" && !+F.staff) { alertMsg("Kimga berilganini tanlang."); return; }
+    if (F.cat===SUPCAT && !F.vendor) { alertMsg("Postavshikni tanlang"); return; }
+    if (F.cat===SUPCAT) { const debt = vendorDebt(F.vendor) + own(F.vendor);
+      if (amount > debt) { alertMsg(`${F.vendor}: qarzimiz ${fmt(debt)} so'm. Summa qarzdan ko'p bo'lmasligi kerak.`); return bad("fAmt"); } }
+    withPhotos(pb, photos => {
+    const r = {amount, cat:F.cat, acc:F.acc, date:$("fDate").value||today(), note:$("fNote").value.trim(), photos};
     if (r.cat.startsWith("__")) {
       const ptype = r.cat==="__boss" ? "avans" : r.cat.slice(2);
       const sid = r.cat==="__boss" ? bossOf().id : +F.staff;
       if (!sid) { alertMsg("Kimga berilganini tanlang."); return; }
       if (o) { D.ops = D.ops.filter(x=>x!==o); unapplyPay(o.id); }
-      D.ops.push({id:uid(), kind:"exp", amount, cat:STAFFCAT, staffId:sid, ptype, month:payMonth(ptype, r.date), acc:F.acc, date:r.date, note:r.note});
+      D.ops.push({id:uid(), kind:"exp", amount, cat:STAFFCAT, staffId:sid, ptype, month:payMonth(ptype, r.date), acc:F.acc, date:r.date, note:r.note, photos});
       return done();
     }
     if (r.cat===SUPCAT) {
@@ -924,6 +965,7 @@ function expSheet(id){
     if (o) { unapplyPay(o.id); Object.assign(o, r); if (o.cat===SUPCAT) applyPay(o); }
     else { const op = {id:uid(), kind:"exp", ...r}; D.ops.push(op); if (op.cat===SUPCAT) applyPay(op); }
     done();
+    });
   }, o && (()=>{ unapplyPay(o.id); D.ops=D.ops.filter(x=>x!==o); }));
 }
 
