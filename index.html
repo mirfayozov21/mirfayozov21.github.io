@@ -139,7 +139,8 @@ input.num.total{font-size:24px;padding:14px;border:2px solid var(--btn)}
 .xrow select,.xrow input{background:var(--bg);padding:10px;font-size:15px}
 .xrow select{width:100%;border:none;border-radius:10px;color:var(--text)}
 .xrow input.num{font-size:16px}
-.xrow .xs{grid-column:1/-1}
+.xrow .xs,.xrow .xk,.xrow.q .xn{grid-column:1/-1}
+.xrow.q{background:rgba(224,138,0,.12)}
 .xrow .xn{grid-column:2/-1}
 .addx{width:100%;border:1.5px dashed var(--btn);background:none;color:var(--btn);border-radius:12px;padding:11px;font-size:15px;font-weight:600}
 </style>
@@ -261,7 +262,7 @@ function balances(){
     if (o.kind==="tr") { b[accOf(o.acc)]-=o.amount; b[accOf(o.to)]+=o.amount; }
   });
   D.sups.forEach(s=>s.pays.forEach(p=>{ if (!p.op) b[accOf(p.acc)]-=p.amount; }));
-  D.cust.forEach(c=>{ if (c.type==="pay") b[accOf(c.acc)]+=c.amount; });
+  D.cust.forEach(c=>{ if (c.type==="pay") b[accOf(c.acc)]+=c.amount; if (c.type==="debt" && c.saleId) b.naqd-=c.amount; });
   return b;
 }
 function supInfo(s){
@@ -532,7 +533,7 @@ function pSale(){
         <h3><span>${fd(d)}</span><span class="green">${fmt(sum(xs,saleTotal))} so'm</span></h3>
         ${xs.map(o=>`<div class="item" data-act="saleEdit" data-id="${o.id}">
           <div class="ico">${o.smena?(+o.smena===1?"☀️":"🌙"):"🛒"}</div>
-          <div class="mid"><div>${smenaShort(+o.smena)}</div><small>Naqd ${fmt(o.naqd||0)} · Bank ${fmt(bankPart(o))}${o.karta?" · Karta "+fmt(o.karta):""}${(()=>{ const e=sum(D.ops.filter(x=>x.kind==="exp"&&x.saleId===o.id),x=>x.amount); return e?` · <span class="red">Rasxod ${fmt(e)}</span>`:""; })()}${o.note?" · "+esc(o.note):""}</small></div>
+          <div class="mid"><div>${smenaShort(+o.smena)}</div><small>Naqd ${fmt(o.naqd||0)} · Bank ${fmt(bankPart(o))}${o.karta?" · Karta "+fmt(o.karta):""}${(()=>{ const e=sum(D.ops.filter(x=>x.kind==="exp"&&x.saleId===o.id),x=>x.amount); const q=sum(D.cust.filter(c=>c.saleId===o.id),c=>c.amount); return (e?` · <span class="red">Rasxod ${fmt(e)}</span>`:"")+(q?` · <span class="orange">Qarzga ${fmt(q)}</span>`:""); })()}${o.note?" · "+esc(o.note):""}</small></div>
           <div class="amt">${fmt(saleTotal(o))}</div>
         </div>`).join("")}
       </div>`; }).join("") : `<div class="card"><div class="empty">Bu oyda savdo kiritilmagan</div></div>`}`;
@@ -688,7 +689,16 @@ function pCust(){
         <div class="mid"><div>${esc(c.name)}</div><small>Oxirgi: ${fd(c.last)}</small></div>
         <div class="amt ${c.bal>0?"green":""}">${c.bal>0?fmt(c.bal):"Qarzi yo'q"}</div>
       </div>`).join("") : `<div class="empty">Hali klient qo'shilmagan</div>`}
-  </div>`;
+  </div>
+  ${(()=>{ const xs = D.cust.slice().sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id).slice(0,30);
+    return xs.length ? `<div class="card">
+    <h3><span>Oxirgi yozuvlar</span></h3>
+    ${xs.map(c=>`<div class="item" data-act="custOpen" data-n="${encodeURIComponent(c.name)}">
+        <div class="ico">${c.type==="debt"?"🤝":"✅"}</div>
+        <div class="mid"><div>${esc(c.name)}</div><small>${fd(c.date)} · ${c.type==="debt"?(c.saleId?`Qarzga tovar · 🧾 ${smenaShort(+c.smena)}`:"Qarzga tovar"):"Qarzini to'ladi"}${c.note?" · "+esc(c.note):""}</small></div>
+        <div class="amt ${c.type==="debt"?"orange":"green"}">${c.type==="debt"?"+":"−"}${fmt(c.amount)}</div>
+      </div>`).join("")}
+  </div>` : ""; })()}`;
 }
 
 /* ================= Oynalar (forma) ================= */
@@ -760,31 +770,36 @@ function saleSheet(id, sm){
     <label class="step"><i>3</i>${SALE.uzcard}</label>${numIn("f_uzcard", o&&o.uzcard)}
     <label class="step"><i>4</i>${SALE.bank}</label>${numIn("f_bank", o&&o.bank)}
     <label class="step"><i>5</i>${SALE.karta}</label>${numIn("f_karta", o&&o.karta)}
-    <label class="step"><i>6</i>Kassadan qilingan rasxodlar</label>
+    <label class="step"><i>6</i>Rasxodlar va qarzga berilgan tovarlar</label>
+    <datalist id="xCustList">${names(D.cust.map(c=>c.name))}</datalist>
     <div id="xRows"></div>
     <button type="button" class="addx" id="xAdd">+ Rasxod qo'shish</button>
     <div class="calc" id="calc"></div>
     ${field("Izoh", textIn("fNote", o?o.note:"", "ixtiyoriy"))}
     ${actions(!!o)}`);
   const vals = () => { const r = {total:num("f_total"), humo:num("f_humo"), uzcard:num("f_uzcard"), bank:num("f_bank"), karta:num("f_karta")};
-    r.naqd = r.total - bankPart(r) - r.karta; r.exp = sum(X.filter(x=>(x.acc||"naqd")==="naqd"), x=>x.amount); r.expOther = sum(X.filter(x=>(x.acc||"naqd")!=="naqd"), x=>x.amount); return r; };
+    r.naqd = r.total - bankPart(r) - r.karta; r.qarz = sum(X.filter(x=>x.cat==="__qarz"), x=>x.amount);
+    r.exp = sum(X.filter(x=>x.cat!=="__qarz" && (x.acc||"naqd")==="naqd"), x=>x.amount) + r.qarz; r.expOther = sum(X.filter(x=>x.cat!=="__qarz" && (x.acc||"naqd")!=="naqd"), x=>x.amount); return r; };
   /* kassadan rasxodlar: alohida rasxod yozuvlari, saleId orqali shu savdoga bog'langan */
   /* turi: oddiy kategoriya yoki "__avans"/"__oylik" (xodimga pul — Xodimlar bo'limida ham ko'rinadi) */
-  let X = o ? D.ops.filter(x=>x.kind==="exp" && x.saleId===o.id).map(x=>({cat:x.staffId?(bossOf()&&x.staffId===bossOf().id?"__boss":"__"+x.ptype):x.cat, amount:x.amount, note:x.note||"", staffId:x.staffId||0, month:x.month, acc:accOf(x.acc)})) : [];
+  let X = o ? D.ops.filter(x=>x.kind==="exp" && x.saleId===o.id).map(x=>({cat:x.staffId?(bossOf()&&x.staffId===bossOf().id?"__boss":"__"+x.ptype):x.cat, amount:x.amount, note:x.note||"", staffId:x.staffId||0, month:x.month, acc:accOf(x.acc)}))
+    .concat(D.cust.filter(c=>c.type==="debt" && c.saleId===o.id).map(c=>({cat:"__qarz", amount:c.amount, note:c.note||"", cust:c.name}))) : [];
   const XCATS = EXP_CATS.filter(c=>c!==STAFFCAT);
-  const XOPT = (bossOf()?[["__boss","⭐ Rahbar oldi"]]:[]).concat([["__avans","👔 Avans"],["__oylik","👔 Oylik"]], XCATS.map(c=>[c,c]));
+  const XOPT = [["__qarz","🤝 Qarzga"]].concat(bossOf()?[["__boss","⭐ Rahbar oldi"]]:[], [["__avans","👔 Avans"],["__oylik","👔 Oylik"]], XCATS.map(c=>[c,c]));
   const staffOpts = () => D.staff.filter(st=>st.active!==false);
   const readX = () => { X = [...$("xRows").querySelectorAll(".xrow")].map((r,i)=>({cat:r.querySelector(".xc").value, amount:+(r.querySelector(".num").value.replace(/\D/g,""))||0,
-    note:r.querySelector(".xn").value.trim(), acc:r.querySelector(".xa").value, staffId:r.querySelector(".xc").value==="__boss" ? (bossOf()||{}).id||0 : r.querySelector(".xs") ? +r.querySelector(".xs").value||0 : 0,
+    note:r.querySelector(".xn").value.trim(), acc:r.querySelector(".xa") ? r.querySelector(".xa").value : "naqd",
+    cust:r.querySelector(".xk") ? r.querySelector(".xk").value.trim() : "", staffId:r.querySelector(".xc").value==="__boss" ? (bossOf()||{}).id||0 : r.querySelector(".xs") ? +r.querySelector(".xs").value||0 : 0,
     month: X[i] && X[i].cat===r.querySelector(".xc").value ? X[i].month : undefined})); };
   const drawX = () => {
-    $("xRows").innerHTML = X.map((x,i)=>{ const isSt = x.cat==="__avans"||x.cat==="__oylik"; return `<div class="xrow">
+    $("xRows").innerHTML = X.map((x,i)=>{ const isSt = x.cat==="__avans"||x.cat==="__oylik", isQ = x.cat==="__qarz"; return `<div class="xrow${isQ?" q":""}">
       <select class="xc">${(XOPT.some(c=>c[0]===x.cat)?XOPT:XOPT.concat([[x.cat,x.cat]])).map(([v,l])=>`<option value="${esc(v)}" ${v===x.cat?"selected":""}>${esc(l)}</option>`).join("")}</select>
       <input class="num" inputmode="numeric" placeholder="summa" value="${x.amount?fmt(x.amount):""}">
       <button type="button" class="x" data-xdel="${i}">×</button>
       ${isSt?`<select class="xs"><option value="">— xodimni tanlang —</option>${staffOpts().map(st=>`<option value="${st.id}" ${st.id===x.staffId?"selected":""}>${esc(st.name)}</option>`).join("")}</select>`:""}
-      <select class="xa">${accs().map(k=>`<option value="${k}" ${k===(x.acc||"naqd")?"selected":""}>${ACC[k].replace("Umumiy bank hisobi","Bank hisobi")}</option>`).join("")}</select>
-      <input class="xn" placeholder="${isSt?"izoh":"izoh (non, suv)"}" value="${esc(x.note)}">
+      ${isQ?`<input class="xk" list="xCustList" placeholder="klient ismi yoki telefoni" value="${esc(x.cust||"")}" autocomplete="off">`:""}
+      ${isQ?"":`<select class="xa">${accs().map(k=>`<option value="${k}" ${k===(x.acc||"naqd")?"selected":""}>${ACC[k].replace("Umumiy bank hisobi","Bank hisobi")}</option>`).join("")}</select>`}
+      <input class="xn" placeholder="${isQ?"qanday tovar (ixtiyoriy)":isSt?"izoh":"izoh (non, suv)"}" value="${esc(x.note)}">
     </div>`; }).join("") || `<div class="lbl" style="margin:2px 0 6px">Bugun kassadan rasxod qilinmagan bo'lsa, bo'sh qoldiring.</div>`;
     $("xRows").querySelectorAll("[data-xdel]").forEach(b=>b.onclick=()=>{ readX(); X.splice(+b.dataset.xdel,1); drawX(); calc(); });
   };
@@ -795,7 +810,8 @@ function saleSheet(id, sm){
       <div class="sub">${[["Humo",v.humo],["Uzcard",v.uzcard],["Hisob raqam",v.bank]].map(([l,x])=>`<span style="white-space:nowrap">${l} ${fmt(x)}</span>`).join(" + ")}</div>
       <div class="line"><span>💳 Karta</span><b>${fmt(v.karta)}</b></div>
       <div class="line ${neg?"red":""}"><span>💵 Naqd savdo</span><b>${(neg?"−":"")+fmt(Math.abs(v.naqd))}</b></div>
-      ${v.exp?`<div class="line"><span>💸 Naqddan rasxod</span><b class="red">−${fmt(v.exp)}</b></div>`:""}
+      ${v.exp-v.qarz?`<div class="line"><span>💸 Naqddan rasxod</span><b class="red">−${fmt(v.exp-v.qarz)}</b></div>`:""}
+      ${v.qarz?`<div class="line"><span>🤝 Qarzga berilgan tovar</span><b class="red">−${fmt(v.qarz)}</b></div>`:""}
       <div class="line cash ${neg||v.naqd-v.exp<0?"red":""}"><span>💵 Kassada qolishi kerak</span><b>${(v.naqd-v.exp<0?"−":"")+fmt(Math.abs(v.naqd-v.exp))}</b></div>
       <div class="sub ${neg?"red":""}">${neg?"Naqdsiz tushum umumiy savdodan ko'p — summalarni tekshiring.":"Naqd savdo avtomatik: umumiy savdo − Humo − Uzcard − Hisob raqam − Karta."}</div>
       ${v.expOther?`<div class="sub">Karta yoki bank hisobidan qilingan rasxodlar: ${fmt(v.expOther)} — o'sha hisoblardan ayiriladi.</div>`:""}`;
@@ -815,20 +831,26 @@ function saleSheet(id, sm){
     if (v.naqd < 0) { alertMsg("Humo, Uzcard, hisob raqam va kartaga tushgan pul umumiy savdodan ko'p bo'lishi mumkin emas."); return bad("f_total"); }
     readX();
     if (X.some(x=>!x.amount && (x.note || x.staffId))) { alertMsg("Rasxod summasini kiriting yoki qatorni o'chiring (×)."); return; }
-    if (X.some(x=>x.amount && x.cat.startsWith("__") && !x.staffId)) { alertMsg("Avans yoki oylik kimga berilganini tanlang."); return; }
+    if (X.some(x=>x.amount && x.cat==="__qarz" && !x.cust)) { alertMsg("Qarzga kimga berilganini yozing (klient ismi)."); return; }
+    if (X.some(x=>x.amount && x.cat.startsWith("__") && x.cat!=="__qarz" && !x.staffId)) { alertMsg("Avans yoki oylik kimga berilganini tanlang."); return; }
     const r = {date:$("fDate").value||today(), note:$("fNote").value.trim(), smena: F.smena ? +F.smena : undefined,
                total:v.total, naqd:v.naqd, humo:v.humo, uzcard:v.uzcard, bank:v.bank, karta:v.karta};
     let sale = o;
     if (o) Object.assign(o,r); else { sale = {id:uid(), kind:"sale", ...r}; D.ops.push(sale); }
     D.ops = D.ops.filter(x=>!(x.kind==="exp" && x.saleId===sale.id));
-    X.filter(x=>x.amount).forEach(x=>{
+    D.cust = D.cust.filter(c=>c.saleId!==sale.id);
+    X.filter(x=>x.amount && x.cat==="__qarz").forEach(x=>{
+      const ex = D.cust.find(c=>vkey(c.name)===vkey(x.cust));
+      D.cust.push({id:uid(), name: ex ? ex.name : x.cust, type:"debt", amount:x.amount, date:r.date, note:x.note, saleId:sale.id, smena:r.smena});
+    });
+    X.filter(x=>x.amount && x.cat!=="__qarz").forEach(x=>{
       const base = {id:uid(), kind:"exp", acc:x.acc||"naqd", amount:x.amount, date:r.date, note:x.note, saleId:sale.id, smena:r.smena};
       if (x.cat.startsWith("__")) { const ptype = x.cat==="__boss" ? "avans" : x.cat.slice(2);
         D.ops.push({...base, cat:STAFFCAT, staffId:x.staffId, ptype, month: x.month || payMonth(ptype, r.date)});
       } else D.ops.push({...base, cat:x.cat});
     });
     done();
-  }, o && (()=>{ D.ops=D.ops.filter(x=>x!==o && !(x.kind==="exp" && x.saleId===o.id)); }));
+  }, o && (()=>{ D.ops=D.ops.filter(x=>x!==o && !(x.kind==="exp" && x.saleId===o.id)); D.cust=D.cust.filter(c=>c.saleId!==o.id); }));
 }
 
 /* --- Rasxod --- */
@@ -1236,7 +1258,7 @@ function custSheet(name){
   const bal = sum(hist, c=>c.type==="debt"?c.amount:-c.amount);
   openSheet(`<h2>${name?esc(name):"Qarz berish / To'lov olish"}</h2>
     ${name?`<div class="box"><div class="line"><span>Hozirgi qarzi</span><b class="${bal>0?"green":""}">${fmt(Math.max(0,bal))} so'm</b></div></div>
-      <h4>Tarix</h4><div class="box">${hist.map(c=>`<div class="line"><span>${fd(c.date)} · ${c.type==="debt"?"Qarz oldi":"To'ladi ("+accLabel(c.acc).split(" ").slice(1).join(" ")+")"}${c.note?" · "+esc(c.note):""}</span><span><b class="${c.type==="debt"?"red":"green"}">${c.type==="debt"?"+":"−"}${fmt(c.amount)}</b><button class="x" data-cDel="${c.id}">×</button></span></div>`).join("")}</div>
+      <h4>Tarix</h4><div class="box">${hist.map(c=>`<div class="line"><span>${fd(c.date)} · ${c.type==="debt"?(c.saleId?`Qarzga oldi · 🧾 ${smenaShort(+c.smena)}`:"Qarz oldi"):"To'ladi ("+accLabel(c.acc).split(" ").slice(1).join(" ")+")"}${c.note?" · "+esc(c.note):""}</span><span><b class="${c.type==="debt"?"red":"green"}">${c.type==="debt"?"+":"−"}${fmt(c.amount)}</b><button class="x" data-cDel="${c.id}">×</button></span></div>`).join("")}</div>
       <h4>Yangi yozuv</h4>`
     : field("Klient ismi", textIn("fName","","ism yoki telefon","custList"))+`<datalist id="custList">${names(D.cust.map(c=>c.name))}</datalist>`}
     ${field("Turi", chips("type", [["debt","➕ Qarzga mol berdik"],["pay","✅ Qarzini to'ladi"]], name&&bal>0?"pay":"debt"))}

@@ -13,6 +13,8 @@ Opened from the owner's Telegram bot via BotFather → Menu Button → that URL.
   "Kassani yopish" form order: umumiy savdo (`total`) → humo → uzcard → hisob raqam (`bank`) → karta; `naqd` = total − those (auto).
   Same form records expenses of the shift as normal exp ops `{acc (naqd|karta|bank, chosen per row), saleId, smena}` (shown in Rasxod; replaced on edit, deleted with the sale).
   Rows of type Avans/Oylik become staff pay ops (`cat:"Oylik", staffId, ptype, month` — avans: month of date, oylik: previous month) and show in Xodimlar → "Berilgan pullar".
+  Kassa rows of type "🤝 Qarzga" (credit sale) become customer debts `D.cust {type:"debt", name, amount, note, saleId, smena}`
+  (not expenses): they reduce "Kassada qolishi kerak" and the naqd balance (`balances()` subtracts debts with `saleId`); shown in Klientlar.
   Both the kassa rows and the Rasxod form offer "⭐ Rahbar oldi" (= avans to `bossOf()`), "👔 Avans", "👔 Oylik" (staff picker); month via `payMonth()`.
   Money accounts are `naqd`, `karta`, `bank` ("Umumiy bank hisobi"): humo/uzcard/bank sales
   all land in `bank`; old ops/start values with acc `humo`/`uzcard` are mapped via `accOf()`. Day/month totals sum both shifts.
@@ -21,7 +23,7 @@ Opened from the owner's Telegram bot via BotFather → Menu Button → that URL.
   (oldest due date first) and is NOT counted as an operating expense.
 - **Postavshik** — supplier deliveries (date, amount, credit days → due date, "N kun qoldi / o'tib ketdi"),
   partial payments, invoice photos; saved supplier list (`D.vendors`) to pick from.
-- **Klientlar** — customer debts (`type:"debt"`) and repayments (`type:"pay"`).
+- **Klientlar** — customer debts (`type:"debt"`) and repayments (`type:"pay"`); "Oxirgi yozuvlar" list (last 30 entries).
 - **Xodimlar** — staff (`D.staff`: salary, payDay, hasBonus, start time, since, active), monthly bonus (`D.bonus`),
   salary/advance payments = expense ops `{cat:"Oylik", staffId, ptype:"avans"|"oylik", month:"YYYY-MM"}`
   (month = whose salary it is; salary of month M is due on payDay of M+1), attendance `D.att` `{staffId, date, in, out}`
