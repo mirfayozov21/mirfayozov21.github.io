@@ -8,7 +8,7 @@ Live at https://mirfayozov21.github.io (GitHub Pages, deploys automatically from
 Opened from the owner's Telegram bot via BotFather → Menu Button → that URL.
 
 ## Features (bottom nav tabs)
-- **Asosiy** — today's sales by payment method, account balances, supplier payment warnings, debts, month summary.
+- **Asosiy** — total supplier debt card on top (tap → Postavshik), today's sales by payment method, account balances, supplier payment warnings, debts, month summary.
 - **Savdo** — sales per cash shift (`smena`: 1 = 08:00–18:00, 2 = 18:00–23:00; old entries have none).
   "Kassani yopish" form order: umumiy savdo (`total`) → humo → uzcard → hisob raqam (`bank`) → karta; `naqd` = total − those (auto).
   Same form records expenses of the shift as normal exp ops `{acc (naqd|karta|bank, chosen per row), saleId, smena}` (shown in Rasxod; replaced on edit, deleted with the sale).

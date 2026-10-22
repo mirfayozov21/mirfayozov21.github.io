@@ -496,6 +496,7 @@ function pHome(){
   const mExp = sum(D.ops.filter(o=>o.kind==="exp"&&o.cat!==SUPCAT&&o.date.startsWith(mk)), o=>o.amount);
   const mSupPaid = sum(D.ops.filter(o=>o.kind==="exp"&&o.cat===SUPCAT&&o.date.startsWith(mk)), o=>o.amount);
   const open = D.sups.map(s=>({s,i:supInfo(s)})).filter(x=>x.i.rem>0);
+  const lateSup = open.filter(x=>x.i.left<0);
   const warn = open.filter(x=>x.i.left<=3).sort((a,c)=>a.i.left-c.i.left);
   const custDebt = sum(custList(), c=>Math.max(0,c.bal));
   const sw = salaryWarnings();
@@ -506,6 +507,12 @@ function pHome(){
     <div class="big">${fmt(sum(ts,saleTotal))} <span>so'm</span></div>
     ${saleSplit(ts)}
     <div class="shifts">${[1,2].map(n=>{ const xs=ts.filter(o=>+o.smena===n); return `<div class="shift ${xs.length?"done":""}" data-act="${xs.length?"saleEdit":"saleNew"}" data-id="${xs.length?xs[0].id:""}" data-sm="${n}"><small>${n===1?"☀️":"🌙"} ${SMENA[n]}</small><b>${xs.length?fmt(sum(xs,saleTotal)):"Kassani yopish ›"}</b></div>`; }).join("")}</div>
+  </div>
+
+  <div class="card" data-act="tab" data-t="sup">
+    <div class="lbl">🚚 Postavshiklarga jami qarzimiz</div>
+    <div class="big red">${fmt(sum(open,x=>x.i.rem))} <span>so'm</span></div>
+    <div class="lbl" style="margin-top:4px">${open.length} ta to'lanmagan yuk${lateSup.length?` · <span class="red">${lateSup.length} ta muddati o'tgan (${fmt(sum(lateSup,x=>x.i.rem))})</span>`:""}</div>
   </div>
 
   ${sw.length ? `<div class="card"><h3>⚠️ Xodimlar oyligi</h3>${sw.map(x=>`
@@ -531,8 +538,7 @@ function pHome(){
   </div>
 
   <div class="card">
-    <h3>Qarzlar</h3>
-    <div class="line" data-act="tab" data-t="sup"><span>🚚 Postavshiklarga qarzimiz</span><b class="red">${fmt(sum(open,x=>x.i.rem))}</b></div>
+    <h3>Klientlar</h3>
     <div class="line" data-act="tab" data-t="cust"><span>👥 Klientlar bizga qarz</span><b class="green">${fmt(custDebt)}</b></div>
   </div>
 
@@ -892,7 +898,7 @@ function expSheet(id){
   const o = id ? D.ops.find(x=>x.id===id) : null;
   openSheet(`<h2>${o?"Rasxodni tahrirlash":"Yangi rasxod"}</h2>
     ${field("Summa", numIn("fAmt", o&&o.amount))}
-    ${field("Turi", chips("cat", (bossOf()?[["__boss","⭐ Rahbar oldi"]]:[]).concat([["__avans","👔 Avans"],["__oylik","👔 Oylik"],[SUPCAT,"🚚 Postavshikka"]],
+    ${field("Turi", chips("cat", (bossOf()?[["__boss","⭐ Rahbar oldi"]]:[]).concat([["__avans","👔 Avans"],["__oylik","👔 Oylik"],[SUPCAT,"🚚 Postavshikka to'lov"]],
         EXP_CATS.filter(c=>c!==STAFFCAT || (o && o.cat===STAFFCAT)).map(c=>[c,c])), o?o.cat:"Boshqa"))}
     <div id="expStaffBox" style="display:none">
       <label>Kimga berildi</label>
@@ -900,6 +906,7 @@ function expSheet(id){
       <div class="lbl" id="esInfo" style="margin-top:6px"></div>
     </div>
     <div id="expVendBox" style="display:none">
+      <div class="lbl" style="margin-bottom:8px">Bu — postavshikka <b>pul berish</b>, qarz kamayadi. Yuk kelgan bo'lsa, <a href="#" id="evNewSup">Postavshik → + Yuk keldi</a> orqali kiriting.</div>
       <label>Qaysi postavshikka</label>
       <input id="evQ" placeholder="qidirish" autocomplete="off">
       <div class="vchips" id="evChips"></div>
@@ -937,6 +944,7 @@ function expSheet(id){
   const toggleV = () => { const on = F.cat===SUPCAT; $("expVendBox").style.display = on?"block":"none"; if (on) drawV();
     $("expStaffBox").style.display = isStaffCat() ? "block" : "none"; staffInfo(); };
   $("evQ").addEventListener("input", drawV);
+  $("evNewSup").onclick = e => { e.preventDefault(); supNewSheet(F.vendor||""); };
   $("fDate").addEventListener("change", staffInfo);
   F.onChip = (n)=>{ if (n==="cat") toggleV(); if (n==="staff") staffInfo(); };
   toggleV();
