@@ -23,7 +23,10 @@ Opened from the owner's Telegram bot via BotFather → Menu Button → that URL.
 - **Rasxod** — current balances (jami + naqd/karta/bank) on top; expense source picker shows each balance (`accChipsBal`); expenses by category and source account; transfers between accounts (`kind:"tr"`).
   Category `Postavshikka` = payment to a supplier: it is applied to that supplier's unpaid deliveries
   (oldest due date first) and is NOT counted as an operating expense.
-- **Postavshik** — supplier deliveries (date, amount, credit days → due date, "N kun qoldi / o'tib ketdi"),
+- **Postavshik** — one row per supplier (filters: "Qarzimiz bor" / "Hammasi"); tap → `vendSheet`: deliveries, payments with source (`payFrom()`: account or "🧾 N-kassadan"), merge with another supplier (`mergeVendor`).
+  `vkey()` ignores case, extra spaces and apostrophe variants; `normalize()` → `dedupeVendors()` merges same-key suppliers.
+  Kassa closing rows of type "🚚 Postavshikka" (`__sup`) become exp ops `{cat:"Postavshikka", vendor, saleId, smena}` applied via `applyPay` (unapplied on edit/delete).
+- Supplier deliveries (date, amount, credit days → due date, "N kun qoldi / o'tib ketdi"),
   partial payments, invoice photos; saved supplier list (`D.vendors`) to pick from.
 - **Klientlar** — customer debts (`type:"debt"`) and repayments (`type:"pay"`); "Oxirgi yozuvlar" list (last 30 entries).
 - **Xodimlar** — staff (`D.staff`: salary, payDay, hasBonus, start time, since, active), monthly bonus (`D.bonus`),

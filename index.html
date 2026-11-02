@@ -139,7 +139,8 @@ input.num.total{font-size:24px;padding:14px;border:2px solid var(--btn)}
 .xrow select,.xrow input{background:var(--bg);padding:10px;font-size:15px}
 .xrow select{width:100%;border:none;border-radius:10px;color:var(--text)}
 .xrow input.num{font-size:16px}
-.xrow .xs,.xrow .xk,.xrow.q .xn{grid-column:1/-1}
+.xrow .xs,.xrow .xk,.xrow .xv,.xrow.q .xn{grid-column:1/-1}
+.xrow.v{background:rgba(0,122,255,.10)}
 .xrow.q{background:rgba(224,138,0,.12)}
 .xrow .xn{grid-column:2/-1}
 .addx{width:100%;border:1.5px dashed var(--btn);background:none;color:var(--btn);border-radius:12px;padding:11px;font-size:15px;font-weight:600}
@@ -342,9 +343,34 @@ function normalize(d){
   }
   r.staff.forEach(st=>{ if (!st.trackFrom) st.trackFrom = today(); });
   r.sups.slice().sort((a,b)=>a.date.localeCompare(b.date)).forEach(x=>ensureVendor(x.sup, x.days, r));
+  dedupeVendors(r);
   return r;
 }
-const vkey = n => String(n||"").trim().toLowerCase();
+/* nom kaliti: katta-kichik harf, ortiqcha bo'sh joy va turli apostroflar (ʻ ʼ ' ` ‘ ’) farqi hisobga olinmaydi */
+const vkey = n => String(n||"").toLowerCase().replace(/[ʻʼ'`‘’]/g,"'").replace(/\s+/g," ").trim();
+/* bir xil nomli postavshiklarni bittaga birlashtirish (telefon va kun saqlanadi) */
+function dedupeVendors(r){
+  const seen = {};
+  r.vendors = r.vendors.filter(v=>{ const k=vkey(v.name); if (!k) return false;
+    const f = seen[k]; if (!f) { seen[k]=v; v.name=String(v.name).replace(/\s+/g," ").trim(); return true; }
+    if (!f.phone && v.phone) f.phone = v.phone; return false; });
+  r.sups.forEach(x=>{ const f=seen[vkey(x.sup)]; if (f) x.sup=f.name; });
+  r.ops.forEach(o=>{ if (o.vendor) { const f=seen[vkey(o.vendor)]; if (f) o.vendor=f.name; } });
+}
+/* bir postavshikni boshqasiga qo'shib yuborish: yuklar va to'lovlar ko'chadi */
+function mergeVendor(from, to){
+  const k = vkey(from.name);
+  D.sups.forEach(x=>{ if (vkey(x.sup)===k) x.sup = to.name; });
+  D.ops.forEach(o=>{ if (o.vendor && vkey(o.vendor)===k) o.vendor = to.name; });
+  if (!to.phone && from.phone) to.phone = from.phone;
+  D.vendors = D.vendors.filter(x=>x!==from);
+}
+/* to'lov qayerdan qilingani: kassadan bo'lsa — qaysi kun va qaysi kassa */
+function payFrom(p){
+  const op = p.op && D.ops.find(o=>o.id===p.op);
+  if (op && op.saleId) return `🧾 ${smenaShort(+op.smena)}dan`;
+  return accLabel(p.acc);
+}
 function findVendor(name, r){ r=r||D; const k=vkey(name); return r.vendors.find(v=>vkey(v.name)===k); }
 function ensureVendor(name, days, r){
   r=r||D; if (!vkey(name)) return null;
@@ -614,8 +640,12 @@ function pSup(){
   const all = D.sups.map(s=>({s,i:supInfo(s)}));
   const open = all.filter(x=>x.i.rem>0);
   const late = open.filter(x=>x.i.left<0);
-  let list = supFilter==="open" ? open.sort((a,b)=>a.i.left-b.i.left) : all.sort((a,b)=>b.s.date.localeCompare(a.s.date));
-  const vs = vendorStats().sort((a,b)=>b.debt-a.debt || b.last.localeCompare(a.last));
+  /* har bir postavshik bitta qatorda: ichida yuklari va to'lovlari */
+  const vs = vendorStats().map(o=>{ const os = open.filter(x=>vkey(x.s.sup)===vkey(o.v.name)).sort((a,b)=>a.i.left-b.i.left);
+    return {...o, near: os[0] ? os[0].i : null, openCnt: os.length}; });
+  const list = supFilter==="open"
+    ? vs.filter(o=>o.debt>0).sort((a,b)=>a.near.left-b.near.left || b.debt-a.debt)
+    : vs.sort((a,b)=>b.debt-a.debt || b.last.localeCompare(a.last) || a.v.name.localeCompare(b.v.name));
   return `
   <div class="card">
     <div class="lbl">Postavshiklarga umumiy qarzimiz</div>
@@ -627,28 +657,18 @@ function pSup(){
   </div>
   <button class="addbtn" data-act="supNew">+ Yuk keldi</button>
   <div class="filters">
-    <button class="${supFilter==="open"?"on":""}" data-act="supF" data-v="open">To'lanmagan</button>
-    <button class="${supFilter==="all"?"on":""}" data-act="supF" data-v="all">Hammasi</button>
-    <button class="${supFilter==="vend"?"on":""}" data-act="supF" data-v="vend">Ro'yxat (${D.vendors.length})</button>
+    <button class="${supFilter==="open"?"on":""}" data-act="supF" data-v="open">Qarzimiz bor (${vs.filter(o=>o.debt>0).length})</button>
+    <button class="${supFilter!=="open"?"on":""}" data-act="supF" data-v="all">Hammasi (${D.vendors.length})</button>
   </div>
-  ${supFilter==="vend" ? `
   <div class="card">
-    ${vs.length ? vs.map(o=>`
+    ${list.length ? list.map(o=>`
       <div class="item" data-act="vendOpen" data-id="${o.v.id}">
         <div class="ico">🏢</div>
-        <div class="mid"><div>${esc(o.v.name)}</div><small>${o.cnt} ta yuk · ${o.v.days} kunlik qarz${o.v.phone?" · "+esc(o.v.phone):""}</small>${o.late?`<span class="bdg bad">${o.late} ta muddati o'tgan</span>`:""}</div>
+        <div class="mid"><div>${esc(o.v.name)}</div><small>${o.cnt} ta yuk${o.openCnt?` · ${o.openCnt} tasi to'lanmagan`:""}</small>${o.near?badge(o.near):""}</div>
         <div class="amt ${o.debt>0?"red":""}">${o.debt>0?fmt(o.debt):"Qarz yo'q"}</div>
-      </div>`).join("") : `<div class="empty">Ro'yxat bo'sh</div>`}
-    <button class="addbtn ghost" style="background:var(--bg2);margin:10px 0 0" data-act="vendNew">+ Postavshik qo'shish</button>
-  </div>` : `
-  <div class="card">
-    ${list.length ? list.map(x=>`
-      <div class="item" data-act="supOpen" data-id="${x.s.id}">
-        <div class="ico">🚚</div>
-        <div class="mid"><div>${esc(x.s.sup)}</div><small>Keldi: ${fd(x.s.date)} · ${x.s.days} kunga${(x.s.photos||[]).length?` · 📎 ${x.s.photos.length}`:""}</small>${badge(x.i)}</div>
-        <div class="amt">${fmt(x.s.amount)}${x.i.rem>0&&x.i.paid>0?`<small>qoldi ${fmt(x.i.rem)}</small>`:""}</div>
-      </div>`).join("") : `<div class="empty">${supFilter==="open"?"To'lanmagan yuk yo'q 👍":"Hali yuk kiritilmagan"}</div>`}
-  </div>`}`;
+      </div>`).join("") : `<div class="empty">${supFilter==="open"?"Postavshiklarga qarzimiz yo'q 👍":"Hali postavshik yo'q"}</div>`}
+    ${supFilter!=="open"?`<button class="addbtn ghost" style="background:var(--bg2);margin:10px 0 0" data-act="vendNew">+ Postavshik qo'shish</button>`:""}
+  </div>`;
 }
 
 function pStaff(){
@@ -804,7 +824,7 @@ function saleSheet(id, sm){
     <label class="step"><i>3</i>${SALE.uzcard}</label>${numIn("f_uzcard", o&&o.uzcard)}
     <label class="step"><i>4</i>${SALE.bank}</label>${numIn("f_bank", o&&o.bank)}
     <label class="step"><i>5</i>${SALE.karta}</label>${numIn("f_karta", o&&o.karta)}
-    <label class="step"><i>6</i>Rasxodlar va qarzga berilgan tovarlar</label>
+    <label class="step"><i>6</i>Rasxodlar, postavshikka to'lov, qarzga berilgan tovarlar</label>
     <datalist id="xCustList">${names(D.cust.map(c=>c.name))}</datalist>
     <div id="xRows"></div>
     <button type="button" class="addx" id="xAdd">+ Rasxod qo'shish</button>
@@ -819,24 +839,29 @@ function saleSheet(id, sm){
     r.exp = sum(X.filter(x=>x.cat!=="__qarz" && (x.acc||"naqd")==="naqd"), x=>x.amount) + r.qarz; r.expOther = sum(X.filter(x=>x.cat!=="__qarz" && (x.acc||"naqd")!=="naqd"), x=>x.amount); return r; };
   /* kassadan rasxodlar: alohida rasxod yozuvlari, saleId orqali shu savdoga bog'langan */
   /* turi: oddiy kategoriya yoki "__avans"/"__oylik" (xodimga pul — Xodimlar bo'limida ham ko'rinadi) */
-  let X = o ? D.ops.filter(x=>x.kind==="exp" && x.saleId===o.id).map(x=>({cat:x.staffId?(bossOf()&&x.staffId===bossOf().id?"__boss":"__"+x.ptype):x.cat, amount:x.amount, note:x.note||"", staffId:x.staffId||0, month:x.month, acc:accOf(x.acc)}))
+  let X = o ? D.ops.filter(x=>x.kind==="exp" && x.saleId===o.id).map(x=>({cat:x.cat===SUPCAT?"__sup":x.staffId?(bossOf()&&x.staffId===bossOf().id?"__boss":"__"+x.ptype):x.cat, amount:x.amount, note:x.note||"", staffId:x.staffId||0, month:x.month, acc:accOf(x.acc), vendor:x.vendor||""}))
     .concat(D.cust.filter(c=>c.type==="debt" && c.saleId===o.id).map(c=>({cat:"__qarz", amount:c.amount, note:c.note||"", cust:c.name}))) : [];
   const XCATS = EXP_CATS.filter(c=>c!==STAFFCAT);
-  const XOPT = [["__qarz","🤝 Qarzga"]].concat(bossOf()?[["__boss","⭐ Rahbar oldi"]]:[], [["__avans","👔 Avans"],["__oylik","👔 Oylik"]], XCATS.map(c=>[c,c]));
+  const XOPT = [["__qarz","🤝 Qarzga"],["__sup","🚚 Postavshikka"]].concat(bossOf()?[["__boss","⭐ Rahbar oldi"]]:[], [["__avans","👔 Avans"],["__oylik","👔 Oylik"]], XCATS.map(c=>[c,c]));
   const staffOpts = () => D.staff.filter(st=>st.active!==false);
+  /* postavshikka kassadan to'lov: shu kassadan oldin to'langani (tahrirlashda) qarzga qaytib hisoblanadi */
+  const ownV = name => o ? sum(D.ops.filter(x=>x.kind==="exp" && x.saleId===o.id && x.cat===SUPCAT && vkey(x.vendor)===vkey(name)), x=>x.amount) : 0;
+  const vDebt = name => vendorDebt(name) + ownV(name);
+  const vendOpts = sel => D.vendors.map(v=>({v, d:vDebt(v.name)})).filter(x=>x.d>0 || vkey(x.v.name)===vkey(sel)).sort((a,b)=>b.d-a.d);
   const readX = () => { X = [...$("xRows").querySelectorAll(".xrow")].map((r,i)=>({cat:r.querySelector(".xc").value, amount:+(r.querySelector(".num").value.replace(/\D/g,""))||0,
     note:r.querySelector(".xn").value.trim(), acc:r.querySelector(".xa") ? r.querySelector(".xa").value : "naqd",
-    cust:r.querySelector(".xk") ? r.querySelector(".xk").value.trim() : "", staffId:r.querySelector(".xc").value==="__boss" ? (bossOf()||{}).id||0 : r.querySelector(".xs") ? +r.querySelector(".xs").value||0 : 0,
+    cust:r.querySelector(".xk") ? r.querySelector(".xk").value.trim() : "", vendor:r.querySelector(".xv") ? r.querySelector(".xv").value : "", staffId:r.querySelector(".xc").value==="__boss" ? (bossOf()||{}).id||0 : r.querySelector(".xs") ? +r.querySelector(".xs").value||0 : 0,
     month: X[i] && X[i].cat===r.querySelector(".xc").value ? X[i].month : undefined})); };
   const drawX = () => {
-    $("xRows").innerHTML = X.map((x,i)=>{ const isSt = x.cat==="__avans"||x.cat==="__oylik", isQ = x.cat==="__qarz"; return `<div class="xrow${isQ?" q":""}">
+    $("xRows").innerHTML = X.map((x,i)=>{ const isSt = x.cat==="__avans"||x.cat==="__oylik", isQ = x.cat==="__qarz", isV = x.cat==="__sup"; return `<div class="xrow${isQ?" q":isV?" v":""}">
       <select class="xc">${(XOPT.some(c=>c[0]===x.cat)?XOPT:XOPT.concat([[x.cat,x.cat]])).map(([v,l])=>`<option value="${esc(v)}" ${v===x.cat?"selected":""}>${esc(l)}</option>`).join("")}</select>
       <input class="num" inputmode="numeric" placeholder="summa" value="${x.amount?fmt(x.amount):""}">
       <button type="button" class="x" data-xdel="${i}">×</button>
       ${isSt?`<select class="xs"><option value="">— xodimni tanlang —</option>${staffOpts().map(st=>`<option value="${st.id}" ${st.id===x.staffId?"selected":""}>${esc(st.name)}</option>`).join("")}</select>`:""}
+      ${isV?`<select class="xv"><option value="">— postavshikni tanlang —</option>${vendOpts(x.vendor).map(y=>`<option value="${esc(y.v.name)}" ${vkey(y.v.name)===vkey(x.vendor)?"selected":""}>${esc(y.v.name)} · qarz ${fmt(y.d)}</option>`).join("")}</select>`:""}
       ${isQ?`<input class="xk" list="xCustList" placeholder="klient ismi yoki telefoni" value="${esc(x.cust||"")}" autocomplete="off">`:""}
       ${isQ?"":`<select class="xa">${accs().map(k=>`<option value="${k}" ${k===(x.acc||"naqd")?"selected":""}>${ACC[k].replace("Umumiy bank hisobi","Bank hisobi")}</option>`).join("")}</select>`}
-      <input class="xn" placeholder="${isQ?"qanday tovar (ixtiyoriy)":isSt?"izoh":"izoh (non, suv)"}" value="${esc(x.note)}">
+      <input class="xn" placeholder="${isQ?"qanday tovar (ixtiyoriy)":isSt||isV?"izoh":"izoh (non, suv)"}" value="${esc(x.note)}">
     </div>`; }).join("") || `<div class="lbl" style="margin:2px 0 6px">Bugun kassadan rasxod qilinmagan bo'lsa, bo'sh qoldiring.</div>`;
     $("xRows").querySelectorAll("[data-xdel]").forEach(b=>b.onclick=()=>{ readX(); X.splice(+b.dataset.xdel,1); drawX(); calc(); });
   };
@@ -854,7 +879,9 @@ function saleSheet(id, sm){
       ${v.expOther?`<div class="sub">Karta yoki bank hisobidan qilingan rasxodlar: ${fmt(v.expOther)} — o'sha hisoblardan ayiriladi.</div>`:""}`;
   };
   $("sheet").oninput = e => { if (e.target.closest("#xRows")) readX(); calc(); };
-  $("sheet").onchange = e => { if (e.target.closest("#xRows")) { readX(); if (e.target.classList.contains("xc")) drawX(); } };
+  $("sheet").onchange = e => { if (e.target.closest("#xRows")) { readX();
+    if (e.target.classList.contains("xv")) { const i=[...$("xRows").querySelectorAll(".xrow")].indexOf(e.target.closest(".xrow")); const x=X[i]; if (x && x.vendor && !x.amount) { x.amount = Math.max(0, vDebt(x.vendor) - sum(X.filter(y=>y!==x && y.cat==="__sup" && vkey(y.vendor)===vkey(x.vendor)), y=>y.amount)); drawX(); calc(); } }
+    if (e.target.classList.contains("xc")) drawX(); } };
   $("xAdd").onclick = () => { readX(); X.push({cat:"Ovqat", amount:0, note:"", acc:"naqd"}); drawX(); const r=$("xRows").querySelectorAll(".xrow"); r[r.length-1].querySelector(".num").focus(); };
   drawX(); calc();
   const dup = () => D.ops.find(x=>x.kind==="sale" && x!==o && x.date===($("fDate").value||today()) && String(x.smena||"")===String(F.smena||""));
@@ -870,12 +897,18 @@ function saleSheet(id, sm){
     readX();
     if (X.some(x=>!x.amount && (x.note || x.staffId))) { alertMsg("Rasxod summasini kiriting yoki qatorni o'chiring (×)."); return; }
     if (X.some(x=>x.amount && x.cat==="__qarz" && !x.cust)) { alertMsg("Qarzga kimga berilganini yozing (klient ismi)."); return; }
-    if (X.some(x=>x.amount && x.cat.startsWith("__") && x.cat!=="__qarz" && !x.staffId)) { alertMsg("Avans yoki oylik kimga berilganini tanlang."); return; }
+    if (X.some(x=>x.amount && x.cat==="__sup" && !x.vendor)) { alertMsg("Qaysi postavshikka to'langanini tanlang."); return; }
+    for (const name of [...new Set(X.filter(x=>x.amount && x.cat==="__sup").map(x=>x.vendor))]) {
+      const t = sum(X.filter(x=>x.cat==="__sup" && x.vendor===name), x=>x.amount), d = vDebt(name);
+      if (t > d) { alertMsg(`${name}: qarzimiz ${fmt(d)} so'm. To'lov qarzdan ko'p bo'lmasligi kerak.`); return; }
+    }
+    if (X.some(x=>x.amount && x.cat.startsWith("__") && x.cat!=="__qarz" && x.cat!=="__sup" && !x.staffId)) { alertMsg("Avans yoki oylik kimga berilganini tanlang."); return; }
     withPhotos(pb, photos => {
     const r = {date:$("fDate").value||today(), note:$("fNote").value.trim(), smena: F.smena ? +F.smena : undefined,
                total:v.total, naqd:v.naqd, humo:v.humo, uzcard:v.uzcard, bank:v.bank, karta:v.karta, photos};
     let sale = o;
     if (o) Object.assign(o,r); else { sale = {id:uid(), kind:"sale", ...r}; D.ops.push(sale); }
+    D.ops.filter(x=>x.kind==="exp" && x.saleId===sale.id && x.cat===SUPCAT).forEach(x=>unapplyPay(x.id));
     D.ops = D.ops.filter(x=>!(x.kind==="exp" && x.saleId===sale.id));
     D.cust = D.cust.filter(c=>c.saleId!==sale.id);
     X.filter(x=>x.amount && x.cat==="__qarz").forEach(x=>{
@@ -884,13 +917,15 @@ function saleSheet(id, sm){
     });
     X.filter(x=>x.amount && x.cat!=="__qarz").forEach(x=>{
       const base = {id:uid(), kind:"exp", acc:x.acc||"naqd", amount:x.amount, date:r.date, note:x.note, saleId:sale.id, smena:r.smena};
-      if (x.cat.startsWith("__")) { const ptype = x.cat==="__boss" ? "avans" : x.cat.slice(2);
+      if (x.cat==="__sup") { const op = {...base, cat:SUPCAT, vendor:(findVendor(x.vendor)||{name:x.vendor}).name}; D.ops.push(op); applyPay(op); }
+      else if (x.cat.startsWith("__")) { const ptype = x.cat==="__boss" ? "avans" : x.cat.slice(2);
         D.ops.push({...base, cat:STAFFCAT, staffId:x.staffId, ptype, month: x.month || payMonth(ptype, r.date)});
       } else D.ops.push({...base, cat:x.cat});
     });
     done();
     });
-  }, o && (()=>{ D.ops=D.ops.filter(x=>x!==o && !(x.kind==="exp" && x.saleId===o.id)); D.cust=D.cust.filter(c=>c.saleId!==o.id); }));
+  }, o && (()=>{ D.ops.filter(x=>x.kind==="exp" && x.saleId===o.id && x.cat===SUPCAT).forEach(x=>unapplyPay(x.id));
+    D.ops=D.ops.filter(x=>x!==o && !(x.kind==="exp" && x.saleId===o.id)); D.cust=D.cust.filter(c=>c.saleId!==o.id); }));
 }
 
 /* --- Rasxod --- */
@@ -1085,7 +1120,7 @@ function supSheet(id){
     <h4>Nakladnoy rasmlari</h4>
     <div class="thumbs">${thumbsHtml(s.photos||[], "data-rmph")}</div>
     ${photoPicker()}
-    ${s.pays.length?`<h4>To'lovlar</h4><div class="box">${s.pays.map(p=>`<div class="line"><span>${fd(p.date)} · ${accLabel(p.acc)}</span><span><b>${fmt(p.amount)}</b><button class="x" data-payDel="${p.id}">×</button></span></div>`).join("")}</div>`:""}
+    ${s.pays.length?`<h4>To'lovlar</h4><div class="box">${s.pays.map(p=>`<div class="line"><span>${fd(p.date)} · ${payFrom(p)}</span><span><b>${fmt(p.amount)}</b><button class="x" data-payDel="${p.id}">×</button></span></div>`).join("")}</div>`:""}
     ${i.rem>0?`<h4>To'lov qilish</h4>
       ${numIn("pAmt", i.rem)}
       ${field("Qayerdan", accChipsBal("acc","naqd"))}
@@ -1144,6 +1179,11 @@ function vendSheet(id){
   const v = id ? D.vendors.find(x=>x.id===id) : null;
   const items = v ? D.sups.filter(x=>vkey(x.sup)===vkey(v.name)).map(x=>({s:x,i:supInfo(x)})).sort((a,b)=>b.s.date.localeCompare(a.s.date)) : [];
   const debt = sum(items, x=>x.i.rem);
+  /* to'lovlar: bitta rasxod bir necha yukka bo'lingan bo'lsa, bitta qator bo'lib ko'rinadi */
+  const pays = []; items.forEach(x=>x.s.pays.forEach(p=>{ const g = p.op && pays.find(y=>y.op===p.op);
+    if (g) g.amount += p.amount; else pays.push({...p}); }));
+  pays.sort((a,b)=>b.date.localeCompare(a.date));
+  const others = v ? D.vendors.filter(x=>x!==v).sort((a,b)=>a.name.localeCompare(b.name)) : [];
   openSheet(`<h2>${v?esc(v.name):"Yangi postavshik"}</h2>
     ${v&&v.phone?`<a class="callbtn" href="tel:${esc(v.phone.replace(/[^+\d]/g,""))}">📞 ${esc(v.phone)}</a>`:""}
     ${v?`<div class="box">
@@ -1154,6 +1194,11 @@ function vendSheet(id){
     ${items.length?`<h4>Yuklar</h4><div class="box">${items.map(x=>`<div class="item" data-act="supOpen" data-id="${x.s.id}" style="border-bottom-color:var(--bg)">
       <div class="mid"><div>${fd(x.s.date)} · ${fmt(x.s.amount)}</div>${badge(x.i)}</div>
       <div class="amt">${x.i.rem>0?`<span class="red">${fmt(x.i.rem)}</span>`:""}${(x.s.photos||[]).length?`<small>📎 ${x.s.photos.length}</small>`:""}</div></div>`).join("")}</div>`:""}
+    ${pays.length?`<h4>To'lovlar</h4><div class="box">${pays.map(p=>`<div class="line"><span>${fd(p.date)} · ${payFrom(p)}</span><b class="green">${fmt(p.amount)}</b></div>`).join("")}
+      <div class="line"><span>Jami to'langan</span><b>${fmt(sum(pays,p=>p.amount))}</b></div></div>`:""}
+    ${others.length?`<h4>Birlashtirish</h4>
+      <div class="lbl" style="margin-bottom:6px">Shu postavshik ro'yxatda boshqa nom bilan ham bormi? Tanlang — yuklari va to'lovlari shu yerga qo'shiladi.</div>
+      <select id="vMerge" style="width:100%;background:var(--bg2);color:var(--text);border:none;border-radius:12px;padding:12px;font-size:15px"><option value="">— tanlang —</option>${others.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join("")}</select>`:""}
     <h4>Ma'lumotlar</h4>`:""}
     ${field("Nomi", textIn("vName", v?v.name:"", "masalan: Coca-Cola"))}
     ${field("Telefon", `<input id="vPhone" type="tel" value="${esc(v?v.phone:"")}" placeholder="+998 ..">`)}
@@ -1161,6 +1206,11 @@ function vendSheet(id){
     ${actions(!!v && !items.length)}
     ${v&&items.length?`<div class="lbl" style="text-align:center;margin-top:8px">Yuklari bor postavshikni o'chirib bo'lmaydi</div>`:""}`);
   if ($("vNewSup")) $("vNewSup").onclick = ()=>supNewSheet(v.name);
+  if ($("vMerge")) $("vMerge").onchange = e => {
+    const o = D.vendors.find(x=>x.id===+e.target.value); if (!o) return;
+    ask(`"${o.name}" ni "${v.name}" ga qo'shib, bitta postavshik qilaymi? "${o.name}" nomi ro'yxatdan o'chadi.`, ()=>{ mergeVendor(o, v); done(true); vendSheet(v.id); });
+    e.target.value = "";
+  };
   bind(()=>{
     const name = $("vName").value.trim(); if (!name) return bad("vName");
     const other = findVendor(name); if (other && other!==v) { alertMsg("Bu nomli postavshik ro'yxatda bor"); return bad("vName"); }
