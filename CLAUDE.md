@@ -1,5 +1,7 @@
 # Do'kon hisobi — Telegram Mini App
 
+Shop name: **Globus kans** (stationery shop). When the owner says "Globus kans" or "do'kon ilovasi", this repo is the app.
+
 Owner speaks Uzbek; reply to them in Uzbek, briefly (they use a phone).
 
 ## What this is
