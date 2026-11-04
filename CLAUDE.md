@@ -14,7 +14,8 @@ Opened from the owner's Telegram bot via BotFather → Menu Button → that URL.
 - **Savdo** — sales per cash shift (`smena`: 1 = 08:00–18:00, 2 = 18:00–23:00; old entries have none).
   "Kassani yopish" form order: umumiy savdo (`total`) → humo → uzcard → hisob raqam (`bank`) → karta; `naqd` = total − those (auto).
   Same form records expenses of the shift as normal exp ops `{acc (naqd|karta|bank, chosen per row), saleId, smena}` (shown in Rasxod; replaced on edit, deleted with the sale).
-  Rows of type Avans/Oylik become staff pay ops (`cat:"Oylik", staffId, ptype, month` — avans: month of date, oylik: previous month) and show in Xodimlar → "Berilgan pullar".
+  Rows of type Avans/Oylik become staff pay ops (`cat:"Oylik", staffId, ptype, month` — avans: month of date, oylik: previous month) and show in Xodimlar → "Berilgan pullar" (each line shows source via `payFromStaff()`: "🧾 N-kassadan · Naqd/Karta/Bank" or the account);
+  the staff sheet lists that month's pays and a full "Barcha to'lovlar tarixi" (`staffPayLine()`).
   Kassa rows of type "🤝 Qarzga" (credit sale) become customer debts `D.cust {type:"debt", name, amount, note, saleId, smena}`
   (not expenses): they reduce "Kassada qolishi kerak" and the naqd balance (`balances()` subtracts debts with `saleId`); shown in Klientlar.
   Both the kassa rows and the Rasxod form offer "⭐ Rahbar oldi" (= avans to `bossOf()`), "👔 Avans", "👔 Oylik", "🎁 Bonus" (staff picker); month via `payMonth()`

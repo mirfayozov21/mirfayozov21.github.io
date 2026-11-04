@@ -195,6 +195,8 @@ const accs = () => ["naqd","karta","bank"];
 const bankPart = o => sum(BANKCH, k=>o[k]||0);
 const SMENA = {1:"1-kassa · 08:00–18:00", 2:"2-kassa · 18:00–23:00"};
 const smenaShort = n => n ? `${n}-kassa` : "Kun bo'yi";
+/* xodimga pul qayerdan berildi: "🧾 1-kassadan · 💵 Naqd" yoki "💳 Karta" */
+const payFromStaff = o => (o.saleId ? `🧾 ${smenaShort(+o.smena)}dan · ` : "") + (o.saleId ? ACC[accOf(o.acc)].replace(" kassa","") : accLabel(o.acc)).replace("Umumiy bank hisobi","Bank hisobi");
 const nowSmena = () => new Date().getHours() < 18 ? "1" : "2";
 const EXP_CATS = ["Ijara","Oylik","Kommunal","Transport","Soliq","Xo'jalik","Ovqat","Boshqa"];
 const MONTHS = ["Yanvar","Fevral","Mart","Aprel","May","Iyun","Iyul","Avgust","Sentabr","Oktabr","Noyabr","Dekabr"];
@@ -716,7 +718,7 @@ function pStaff(){
     ${pays.length ? pays.map(o=>`<div class="item" data-act="staffPayEdit" data-id="${o.id}">
         <div class="ico">${o.ptype==="avans"?"💵":o.ptype==="bonus"?"🎁":"👔"}</div>
         <div class="mid"><div>${esc((D.staff.find(x=>x.id===o.staffId)||{}).name||"xodim")}</div>
-          <small>${fd(o.date)} · ${ptLabel(o.ptype)} (${mLabel(o.month)})${o.saleId?` · 🧾 ${smenaShort(+o.smena)}dan`:""}${o.note?" · "+esc(o.note):""}</small></div>
+          <small>${fd(o.date)} · ${ptLabel(o.ptype)} (${mLabel(o.month)})<br>${payFromStaff(o)}${o.note?" · "+esc(o.note):""}</small></div>
         <div class="amt">${fmt(o.amount)}</div>
       </div>`).join("") : `<div class="empty">Bu oyda pul berilmagan</div>`}
   </div>`; })()}
@@ -1230,6 +1232,8 @@ function vendSheet(id){
 }
 
 /* --- Xodim --- */
+/* bitta to'lov qatori: sana, turi (qaysi oy uchun), qayerdan (kassa / naqd / karta / bank) */
+const staffPayLine = (o, withMonth) => `<div class="line" data-act="staffPayEdit" data-id="${o.id}"><span>${fd(o.date)} · ${o.ptype==="avans"?"💵":o.ptype==="bonus"?"🎁":"👔"} ${ptLabel(o.ptype)}${withMonth?` (${mLabel(o.month)})`:""}<br><small class="lbl">${payFromStaff(o)}${o.note?" · "+esc(o.note):""}</small></span><b>${fmt(o.amount)}</b></div>`;
 function staffSheet(id, m){
   const st = id ? D.staff.find(x=>x.id===id) : null;
   m = m || monthKey(cur);
@@ -1247,8 +1251,10 @@ function staffSheet(id, m){
       <div class="line"><span>${i.rem>=0?"Berilishi kerak":"Ortiqcha berilgan"}</span><b class="${i.rem>0?"red":""}">${fmt(Math.abs(i.rem))}</b></div>
       <div class="line"><span>Berish muddati</span><b>${fd(i.due)}</b></div>
     </div>
-    ${pays.length?`<h4>Berilgan pullar</h4><div class="box">${pays.map(o=>`<div class="line" data-act="staffPayEdit" data-id="${o.id}"><span>${fd(o.date)} · ${ptLabel(o.ptype)} · ${accLabel(o.acc).split(" ").slice(1).join(" ")}</span><b>${fmt(o.amount)}</b></div>`).join("")}</div>`:""}
+    ${pays.length?`<h4>${mLabel(m)} uchun berilgan pullar</h4><div class="box">${pays.map(o=>staffPayLine(o)).join("")}</div>`:""}
     <div class="actions"><button class="save" id="giveBtn">💵 Pul berish (avans / oylik / bonus)</button></div>
+    ${(()=>{ const all = staffPays(st.id).sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id); if (!all.length) return "";
+      return `<h4>Barcha to'lovlar tarixi · ${all.length} ta, jami ${fmt(sum(all,o=>o.amount))}</h4><div class="box">${all.map(o=>staffPayLine(o, true)).join("")}</div>`; })()}
     <h4>Davomat · ${mLabel(m)}</h4>
     <div class="box">
       <div class="line"><span>Ish tartibi</span><b style="text-align:right">${schedText(st)}</b></div>
