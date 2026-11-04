@@ -17,7 +17,8 @@ Opened from the owner's Telegram bot via BotFather → Menu Button → that URL.
   Rows of type Avans/Oylik become staff pay ops (`cat:"Oylik", staffId, ptype, month` — avans: month of date, oylik: previous month) and show in Xodimlar → "Berilgan pullar".
   Kassa rows of type "🤝 Qarzga" (credit sale) become customer debts `D.cust {type:"debt", name, amount, note, saleId, smena}`
   (not expenses): they reduce "Kassada qolishi kerak" and the naqd balance (`balances()` subtracts debts with `saleId`); shown in Klientlar.
-  Both the kassa rows and the Rasxod form offer "⭐ Rahbar oldi" (= avans to `bossOf()`), "👔 Avans", "👔 Oylik" (staff picker); month via `payMonth()`.
+  Both the kassa rows and the Rasxod form offer "⭐ Rahbar oldi" (= avans to `bossOf()`), "👔 Avans", "👔 Oylik", "🎁 Bonus" (staff picker); month via `payMonth()`
+  (oylik and bonus = previous month). Bonus pays (`ptype:"bonus"`) raise the month total in `salaryInfo()` (total = salary + max(set bonus, bonus paid)), so they never eat into the salary remainder.
   Money accounts are `naqd`, `karta`, `bank` ("Umumiy bank hisobi"): humo/uzcard/bank sales
   all land in `bank`; old ops/start values with acc `humo`/`uzcard` are mapped via `accOf()`. Day/month totals sum both shifts.
 - **Rasxod** — current balances (jami + naqd/karta/bank) on top; expense source picker shows each balance (`accChipsBal`); expenses by category and source account; transfers between accounts (`kind:"tr"`).
